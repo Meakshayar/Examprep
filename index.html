@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Exam Prep - Gamified (Smart SRS)</title>
+    <title>PSC Exam Prep - Gamified (Smart SRS)</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
@@ -36,35 +36,47 @@
             justify-content: center; transition: all 0.3s; padding: 20px;
         }
 
-        body.practice-active { padding: 0 !important; margin: 0 !important; height: 100vh; width: 100vw; overflow: hidden; align-items: flex-start; background: #fff; }
+        body.practice-active { 
+            padding: 0 !important; margin: 0 !important; 
+            height: 100vh; height: 100dvh; /* Dynamic viewport fix */
+            width: 100vw; overflow: hidden; 
+            overscroll-behavior-y: none; /* Prevent pull-to-refresh freeze */
+            align-items: flex-start; background: #fff; 
+        }
         body.practice-active .container, body.practice-active #adminPanel { max-width: 100% !important; width: 100% !important; height: 100% !important; border-radius: 0; box-shadow: none; background: #fff; padding: 0; margin: 0; }
         body.practice-active header, body.practice-active nav { display: none !important; }
         body.practice-active main { height: 100%; padding: 0 !important; }
         body.practice-active .tab-content { padding: 0; height: 100%; display: block; }
 
-        #practiceSessionView { height: 100vh; width: 100vw; display: flex; flex-direction: column; background: #fdfdfd; }
-        #topProgressIndicator { flex: 0 0 50px; background: linear-gradient(135deg, var(--primary-color), var(--secondary-color)); color: white; display: flex; align-items: center; padding: 0 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); z-index: 20; }
-        #practiceSessionViewContentWrapper { flex: 1; display: flex; flex-direction: column; overflow: hidden; position: relative; }
+        #practiceSessionView { 
+            height: 100vh; height: 100dvh; 
+            width: 100vw; display: flex; flex-direction: column; background: #fdfdfd; 
+        }
+        #topProgressIndicator { flex: 0 0 50px; min-height: 50px; background: linear-gradient(135deg, var(--primary-color), var(--secondary-color)); color: white; display: flex; align-items: center; padding: 0 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); z-index: 20; }
+        #practiceSessionViewContentWrapper { 
+            flex: 1 1 auto; min-height: 0; /* min-height: 0 fixes flexbox scroll blowing out bounds */
+            display: flex; flex-direction: column; overflow: hidden; position: relative; 
+        }
 
         @media screen and (min-width: 1024px) {
             #practiceSessionViewContentWrapper { flex-direction: row; }
-            #questionScrollContainer { flex: 1; height: 100%; overflow-y: auto; padding: 40px; background: #f8f9fa; border-right: 1px solid #e0e0e0; }
+            #questionScrollContainer { flex: 1 1 auto; min-height: 0; height: 100%; overflow-y: auto; padding: 40px; background: #f8f9fa; border-right: 1px solid #e0e0e0; -webkit-overflow-scrolling: touch; }
             #practiceQuestion { background: white; padding: 30px; border-radius: var(--border-radius); box-shadow: 0 2px 10px rgba(0,0,0,0.05); font-size: 1.3em; line-height: 1.8; max-width: 900px; margin: 0 auto; }
-            #optionsGridContainer { flex: 0 0 400px; height: 100%; overflow-y: auto; background: white; padding: 20px; display: flex; flex-direction: column; justify-content: center; border-top: none; position: static !important; }
+            #optionsGridContainer { flex: 0 0 400px; min-height: 0; height: 100%; overflow-y: auto; background: white; padding: 20px; display: flex; flex-direction: column; justify-content: center; border-top: none; position: static !important; -webkit-overflow-scrolling: touch; }
             #optionsGrid { display: flex; flex-direction: column; gap: 15px; height: auto; }
             .option-grid-item { width: 100%; padding: 20px; font-size: 1.1em; justify-content: flex-start; text-align: left; }
         }
 
         @media screen and (max-width: 1023px) {
             #practiceSessionViewContentWrapper { flex-direction: column; }
-            #questionScrollContainer { flex: 1; overflow-y: auto; padding: 15px; background: #f8f9fa; }
+            #questionScrollContainer { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 15px; background: #f8f9fa; -webkit-overflow-scrolling: touch; }
             #practiceQuestion { padding: 15px; font-size: 1.1em; }
-            #optionsGridContainer { flex: 0 0 auto; max-height: 40vh; overflow-y: auto; padding: 10px; background: white; border-top: 1px solid #ddd; position: static !important; }
+            #optionsGridContainer { flex: 0 0 auto; max-height: 40vh; overflow-y: auto; padding: 10px; background: white; border-top: 1px solid #ddd; position: static !important; -webkit-overflow-scrolling: touch; }
             #optionsGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
             .option-grid-item { padding: 12px 5px; font-size: 0.9em; height: 100%; min-height: 50px; }
         }
 
-        #examFooter { flex: 0 0 60px; background: white; border-top: 1px solid #ddd; display: flex; align-items: center; justify-content: flex-end; padding: 0 20px; gap: 15px; z-index: 20; position: static !important; }
+        #examFooter { flex: 0 0 60px; min-height: 60px; background: white; border-top: 1px solid #ddd; display: flex; align-items: center; justify-content: flex-end; padding: 0 20px; gap: 15px; z-index: 20; position: static !important; }
 
         .container, #adminPanel { width: 100%; max-width: 1000px; margin: 0 auto; background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); border-radius: var(--border-radius); box-shadow: var(--shadow); overflow: hidden; border: 1px solid rgba(255, 255, 255, 0.2); transition: all 0.3s; min-height: 80vh; }
         header { background: linear-gradient(135deg, var(--primary-color), var(--secondary-color)); color: white; padding: 15px; text-align: center; position: relative; }
@@ -137,7 +149,7 @@
                 </div>
             </div>
 
-            <h1>Exam Prep</h1>
+            <h1>PSC Exam Prep</h1>
             <p>Level Up Your Knowledge</p>
             <img id="playerPFP" src="https://placehold.co/80x80/FFFFFF/333333?text=PFP" alt="Profile Picture" class="hidden" style="width: 80px; height: 80px; border-radius: 50%; margin: 10px auto; display: block; border: 3px solid white; cursor: pointer;" onclick="showPlayerStatsModal()">
             <input type="file" id="pfpUploadHidden" accept="image/*" class="hidden">
@@ -477,7 +489,6 @@
         const quotes = ["The secret to getting ahead is getting started.", "Believe you can and you're halfway there.", "Success is the sum of small efforts, repeated day in and day out.", "The mind is everything. What you think you become.", "Strive for progress, not perfection."];
         let audioCtx;
 
-        // --- UPDATED FIREBASE CONFIG ---
         let firebaseConfig = {
             apiKey: "AIzaSyDOwkZXMmiaPInoXQaj5wk1LUObRZXWihk",
             authDomain: "binoy-6a74a.firebaseapp.com",
@@ -1151,14 +1162,14 @@
             else {
                 let totalTimeLimitCalculation = 0;
                 const setCategory = questionSets[setName].category;
-                if (setCategory === 'math') { totalTimeLimitCalculation = currentSet.length * 120; } // Increased Time
+                if (setCategory === 'math') { totalTimeLimitCalculation = currentSet.length * 120; } 
                 else {
                     let statementCount = 0;
                     let regularCount = 0;
                     currentSet.forEach(q => { if (q.type === 'statement') { statementCount++; } else { regularCount++; } });
-                    totalTimeLimitCalculation = (statementCount * 60) + (regularCount * 30); // Increased Time limit to stop abrupt endings
+                    totalTimeLimitCalculation = (statementCount * 60) + (regularCount * 30); 
                 }
-                totalTimeLimit = totalTimeLimitCalculation || 300; // 5 minute fallback
+                totalTimeLimit = totalTimeLimitCalculation || 300; 
             }
             currentAttempt = { playerName: currentPlayerName, setName: setName, startTime: new Date().toISOString(), localDateStr: getTodayDateString(), answers: [], score: 0, totalQuestions: currentSet.length, timeLimit: totalTimeLimit, isRevision: isRevisionMode, revisionKey: isRevisionMode ? currentRevisionKey : null };
             document.getElementById('examFooter').style.display = 'flex'; 
@@ -1193,7 +1204,7 @@
             document.getElementById('totalQuestions').textContent = currentSet.length;
             
             const question = currentSet[currentQuestionIndex];
-            const qText = question.question || "Missing question text"; // Safeguard against missing text
+            const qText = question.question || "Missing question text"; 
             let questionHTML = '';
             
             if (question.type === 'statement') {
@@ -1204,7 +1215,7 @@
             }
             document.getElementById('practiceQuestion').innerHTML = questionHTML;
             
-            const qOptions = question.options || []; // Safeguard against missing options
+            const qOptions = question.options || []; 
             const optionIds = ['optionGridA', 'optionGridB', 'optionGridC', 'optionGridD'];
             optionIds.forEach((id, index) => {
                 const optionDiv = document.getElementById(id);
@@ -1249,7 +1260,6 @@
             } else { 
                 document.getElementById('endPracticeBtn').style.display = 'none'; 
                 document.getElementById('nextQuestionBtn').style.display = 'inline-block'; 
-                // Fix: Do not override .onclick here, as it permanently breaks standard Next button functionality
             }
         }     
         
@@ -1303,7 +1313,7 @@
                 switchPracticeView('practiceSetupView');
                 return;
             }
-            document.getElementById('examFooter').style.display = 'none'; 
+            document.getElementById('examFooter').style.display = 'flex'; 
             const totalQuestions = currentAttempt.totalQuestions;
             const questionsViewed = currentAttempt.answers.length;
             const setName = currentAttempt.setName;
