@@ -1,0 +1,2277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Exam Prep - Gamified (Smart SRS)</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
+
+    <style>
+        /* --- GLOBAL VARIABLES & BASE STYLES --- */
+        :root {
+            --primary-color: #8e44ad;
+            --secondary-color: #3498db;
+            --success-color: #2ecc71;
+            --danger-color: #e74c3c;
+            --warning-color: #f39c12;
+            --light-color: #ffffff;
+            --dark-color: #2c3e50;
+            --bg-color: #34495e;
+            --font-family: 'Poppins', sans-serif;
+            --border-radius: 12px;
+            --shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: var(--font-family); background: linear-gradient(135deg, #1d2b64, #f8cdda);
+            background-size: 400% 400%; animation: gradientAnimation 15s ease infinite;
+            min-height: 100vh; color: var(--dark-color); display: flex; align-items: center;
+            justify-content: center; transition: all 0.3s; padding: 20px;
+        }
+
+        body.practice-active { padding: 0 !important; margin: 0 !important; height: 100vh; width: 100vw; overflow: hidden; align-items: flex-start; background: #fff; }
+        body.practice-active .container, body.practice-active #adminPanel { max-width: 100% !important; width: 100% !important; height: 100% !important; border-radius: 0; box-shadow: none; background: #fff; padding: 0; margin: 0; }
+        body.practice-active header, body.practice-active nav { display: none !important; }
+        body.practice-active main { height: 100%; padding: 0 !important; }
+        body.practice-active .tab-content { padding: 0; height: 100%; display: block; }
+
+        #practiceSessionView { height: 100vh; width: 100vw; display: flex; flex-direction: column; background: #fdfdfd; }
+        #topProgressIndicator { flex: 0 0 50px; background: linear-gradient(135deg, var(--primary-color), var(--secondary-color)); color: white; display: flex; align-items: center; padding: 0 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); z-index: 20; }
+        #practiceSessionViewContentWrapper { flex: 1; display: flex; flex-direction: column; overflow: hidden; position: relative; }
+
+        @media screen and (min-width: 1024px) {
+            #practiceSessionViewContentWrapper { flex-direction: row; }
+            #questionScrollContainer { flex: 1; height: 100%; overflow-y: auto; padding: 40px; background: #f8f9fa; border-right: 1px solid #e0e0e0; }
+            #practiceQuestion { background: white; padding: 30px; border-radius: var(--border-radius); box-shadow: 0 2px 10px rgba(0,0,0,0.05); font-size: 1.3em; line-height: 1.8; max-width: 900px; margin: 0 auto; }
+            #optionsGridContainer { flex: 0 0 400px; height: 100%; overflow-y: auto; background: white; padding: 20px; display: flex; flex-direction: column; justify-content: center; border-top: none; position: static !important; }
+            #optionsGrid { display: flex; flex-direction: column; gap: 15px; height: auto; }
+            .option-grid-item { width: 100%; padding: 20px; font-size: 1.1em; justify-content: flex-start; text-align: left; }
+        }
+
+        @media screen and (max-width: 1023px) {
+            #practiceSessionViewContentWrapper { flex-direction: column; }
+            #questionScrollContainer { flex: 1; overflow-y: auto; padding: 15px; background: #f8f9fa; }
+            #practiceQuestion { padding: 15px; font-size: 1.1em; }
+            #optionsGridContainer { flex: 0 0 auto; max-height: 40vh; overflow-y: auto; padding: 10px; background: white; border-top: 1px solid #ddd; position: static !important; }
+            #optionsGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+            .option-grid-item { padding: 12px 5px; font-size: 0.9em; height: 100%; min-height: 50px; }
+        }
+
+        #examFooter { flex: 0 0 60px; background: white; border-top: 1px solid #ddd; display: flex; align-items: center; justify-content: flex-end; padding: 0 20px; gap: 15px; z-index: 20; position: static !important; }
+
+        .container, #adminPanel { width: 100%; max-width: 1000px; margin: 0 auto; background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); border-radius: var(--border-radius); box-shadow: var(--shadow); overflow: hidden; border: 1px solid rgba(255, 255, 255, 0.2); transition: all 0.3s; min-height: 80vh; }
+        header { background: linear-gradient(135deg, var(--primary-color), var(--secondary-color)); color: white; padding: 15px; text-align: center; position: relative; }
+        nav { display: flex; background: var(--dark-color); flex-wrap: wrap; justify-content: center; }
+        nav button { background: none; border: none; color: var(--light-color); padding: 15px 20px; cursor: pointer; font-size: 14px; font-family: var(--font-family); transition: all 0.3s; font-weight: 600; flex-grow: 1; }
+        nav button:hover { background: rgba(255,255,255,0.1); }
+        nav button.active { background: var(--primary-color); }
+
+        .tab-content { display: none; padding: 25px; animation: fadeIn 0.5s; }
+        .tab-content.active { display: block; }
+        .view-stage.hidden, .hidden { display: none !important; }
+
+        button { background: linear-gradient(135deg, var(--secondary-color), var(--primary-color)); color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: 600; transition: transform 0.2s; }
+        button:hover { transform: translateY(-2px); }
+        button:active { transform: translateY(0); }
+        .btn-success { background: linear-gradient(135deg, var(--success-color), #27ae60); }
+        .btn-danger { background: linear-gradient(135deg, var(--danger-color), #c0392b); }
+        .btn-warning { background: linear-gradient(135deg, var(--warning-color), #d35400); }
+
+        input, select, textarea { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ddd; border-radius: 8px; font-family: inherit; }
+
+        .statement-question { text-align: justify; line-height: 1.8; }
+        .statement-question strong { display: block; margin-bottom: 15px; color: #2c3e50; }
+        .statement-question br { display: block; margin-bottom: 8px; content: ""; }
+
+        .option-grid-item { display: flex; align-items: center; justify-content: center; background: white; border: 2px solid #e9ecef; border-radius: var(--border-radius); font-weight: 600; cursor: pointer; transition: all 0.2s; user-select: none; }
+        .option-grid-item:hover { border-color: var(--primary-color); background: #fefefe; }
+        .option-grid-item.correct { background: var(--success-color); color: white; border-color: var(--success-color); }
+        .option-grid-item.wrong { background: var(--danger-color); color: white; border-color: var(--danger-color); }
+        .option-letter { font-weight: bold; margin-right: 10px; min-width: 20px; }
+
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes gradientAnimation { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+
+        .dashboard-card { background: #eee; padding: 20px; border-radius: 10px; margin-bottom: 15px; color: white; }
+        .history-item { background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 10px; border-left: 4px solid #ddd; }
+        
+        .modal { display: none; position: fixed; z-index: 3000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.6); backdrop-filter: blur(5px); align-items: center; justify-content: center; }
+        .modal-content { background-color: #fff; padding: 30px; border-radius: 15px; width: 90%; max-width: 500px; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.2); max-height: 80vh; overflow-y: auto; }
+
+        .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; margin-top: 10px; }
+        .calendar-day { padding: 8px; text-align: center; border-radius: 5px; font-size: 0.9em; }
+        .calendar-day.present { background: var(--success-color); color: white; }
+        .calendar-day.today { border: 2px solid var(--primary-color); }
+        
+        .header-menu { position: absolute; top: 15px; right: 15px; }
+        .menu-btn { background: rgba(255,255,255,0.2); border: none; color: white; width: 35px; height: 35px; border-radius: 50%; cursor: pointer; }
+        .dropdown-content { display: none; position: absolute; right: 0; top: 40px; background: white; min-width: 150px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); border-radius: 8px; overflow: hidden; z-index: 100; }
+        .dropdown-content button { width: 100%; text-align: left; background: white; color: #333; border-radius: 0; }
+        .dropdown-content button:hover { background: #f1f1f1; }
+        .show { display: block; }
+
+        #confetti-canvas { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 2000; }
+
+        .login-container { max-width: 400px; margin: 40px auto; padding: 20px; }
+        .login-form { background: white; padding: 20px; border-radius: 15px; box-shadow: 0 5px 20px rgba(0,0,0,0.05); }
+    </style>
+</head>
+<body>
+    <canvas id="confetti-canvas"></canvas>
+
+    <div class="container">
+        <header>
+            <div class="header-menu">
+                <button class="menu-btn" onclick="toggleMenu()">&#9776;</button>
+                <div id="myDropdown" class="dropdown-content">
+                    <button onclick="switchTab('help')">How it Works</button>
+                    <button onclick="triggerPFPUpload()">Change Profile Pic</button>
+                    <button onclick="logout()" class="btn-danger">Switch User / Logout</button>
+                </div>
+            </div>
+
+            <h1>PSC Exam Prep</h1>
+            <p>Level Up Your Knowledge</p>
+            <img id="playerPFP" src="https://placehold.co/80x80/FFFFFF/333333?text=PFP" alt="Profile Picture" class="hidden" style="width: 80px; height: 80px; border-radius: 50%; margin: 10px auto; display: block; border: 3px solid white; cursor: pointer;" onclick="showPlayerStatsModal()">
+            <input type="file" id="pfpUploadHidden" accept="image/*" class="hidden">
+            
+            <div id="playerStats" class="player-stats hidden" style="background: rgba(0,0,0,0.1); padding: 10px; border-radius: 8px; margin-top: 10px;">
+                <p id="playerNameDisplay" style="font-weight: bold;"></p>
+                <p>Title: <span id="playerTitle"></span> (<span id="playerXP">0</span> XP)</p>
+                <div class="xp-bar" style="height: 6px; background: rgba(255,255,255,0.3); border-radius: 3px; margin-top: 5px;">
+                    <div id="xpBarFill" class="xp-bar-fill" style="height: 100%; background: var(--warning-color); width: 0%; border-radius: 3px; transition: width 0.5s;"></div>
+                </div>
+            </div>
+        </header>
+
+        <nav id="tab-nav" class="hidden">
+            <button onclick="switchTab('practice')" class="active">Practice</button>
+            <button onclick="switchTab('revision')">Revision Plan</button>
+            <button onclick="switchTab('backlog')">Backlog</button>
+            <button onclick="switchTab('leaderboard')">Leaderboard</button>
+            <button onclick="switchTab('attendance')">Attendance</button>
+        </nav>
+        
+        <main>
+            <div id="practice" class="tab-content active">
+                <div id="loginGatewayView" class="view-stage">
+                    <div class="login-container">
+                        <div class="login-form">
+                            <h3>Login to Your Account</h3>
+                            <select id="playerSelect" class="styled-select" style="margin-bottom: 15px;"></select>
+                            <button onclick="handlePlayerSelection()" class="btn-primary" style="width: 100%;">Login</button>
+                            <button onclick="showCreatePlayerForm()" style="width: 100%; background: transparent; color: #555; margin-top: 10px;">Create New Player</button>
+                            
+                            <div id="createPlayerForm" class="hidden" style="margin-top: 20px; border-top: 1px solid #eee; padding-top: 20px;">
+                                <input type="text" id="newPlayerName" placeholder="Enter your name">
+                                <button onclick="createPlayer()" class="btn-success" style="width: 100%;">Create & Start</button>
+                                <button onclick="hideCreatePlayerForm()" style="background: #eee; color: #333; margin-top: 5px; width: 100%;">Cancel</button>
+                            </div>
+                        </div>
+                        <div style="text-align: center; margin-top: 20px;">
+                            <button onclick="handleAdminLogin()" style="background: transparent; color: #333; border: 1px solid #ddd;">Admin Login</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="practiceSetupView" class="view-stage hidden">
+                    <h2 id="setupWelcome">Welcome!</h2>
+                    <div style="background: #f9f9f9; padding: 15px; border-radius: 8px; margin: 15px 0; border-left: 4px solid var(--primary-color);">
+                        <p id="motivationalQuoteLoggedIn" style="font-style: italic;">Ready to learn?</p>
+                    </div>
+                    
+                    <div class="form-group" style="margin-top: 20px;">
+                        <label>1. Select Subject:</label>
+                        <select id="subjectSelect" onchange="updatePracticeSetSelect(this.value)"></select>
+                    </div>
+                    <div class="form-group">
+                        <label>2. Select Question Set:</label>
+                        <select id="practiceSetSelect"></select>
+                    </div>
+                    
+                    <button onclick="startPracticeWrapper()" id="startPracticeBtn" disabled style="width: 100%; padding: 15px; font-size: 1.1em; margin-top: 20px;">Start Practice</button>
+                    <button onclick="syncQuestionSetsFromFirebase()" class="btn-warning" style="width: 100%; margin-top: 10px; font-size: 0.9em;">Sync Latest Questions</button>
+                </div>
+
+                <div id="practiceSessionView" class="view-stage hidden">
+                    <div id="topProgressIndicator">
+                        <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                            <div>Q: <span id="currentQuestionNum">1</span>/<span id="totalQuestions">0</span></div>
+                            <div id="practiceTimer" style="font-weight: bold;">Time: 00:00</div>
+                            <button onclick="reportCurrentQuestion()" class="btn-warning" id="reportQuestionBtn" style="padding: 4px 10px; font-size: 0.8em; border: 1px solid white;">Report</button>
+                        </div>
+                    </div>
+                    
+                    <div id="practiceSessionViewContentWrapper">
+                        <div id="questionScrollContainer">
+                            <div id="practiceQuestion"></div>
+                        </div>
+
+                        <div id="optionsGridContainer">
+                            <div id="optionsGrid">
+                                <div class="option-grid-item" onclick="selectOption(0)" id="optionGridA"><span class="option-letter">A.</span> <span class="option-text"></span></div>
+                                <div class="option-grid-item" onclick="selectOption(1)" id="optionGridB"><span class="option-letter">B.</span> <span class="option-text"></span></div>
+                                <div class="option-grid-item" onclick="selectOption(2)" id="optionGridC"><span class="option-letter">C.</span> <span class="option-text"></span></div>
+                                <div class="option-grid-item" onclick="selectOption(3)" id="optionGridD"><span class="option-letter">D.</span> <span class="option-text"></span></div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="score" id="practiceScore" style="display: none;">Score: 0</div>
+
+                    <div id="examFooter">
+                        <button onclick="endPractice()" class="btn-danger" id="endPracticeBtn">End Session</button>
+                        <button onclick="nextQuestionManual()" class="btn-success" id="nextQuestionBtn" style="display: none;">Next Question &rarr;</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="revision" class="tab-content">
+                <h2>Revision Plan</h2>
+                <div style="background: #e0e6ed; padding: 15px; border-radius: 8px; margin: 15px 0;">
+                    <p id="revisionSuccessInfo">Check here daily for items due for revision.</p>
+                </div>
+                <p id="revisionUserPrompt" class="hidden" style="color: var(--danger-color);">Select a player in the Practice tab first.</p>
+                <div id="dueTodayList"></div>
+            </div>
+            
+            <div id="backlog" class="tab-content">
+                <h2>Backlog</h2>
+                <p>Missed revisions appear here.</p>
+                <div id="fullBacklogList"></div>
+            </div>
+
+            <div id="leaderboard" class="tab-content">
+                <h2>Leaderboards</h2>
+                <h3>Today's Top Scores</h3>
+                <table class="leaderboard-table" style="width: 100%; border-collapse: collapse; margin-top: 10px;">
+                    <thead><tr style="background: #f0f0f0;"><th style="padding:10px; text-align:left;">Rank</th><th style="padding:10px; text-align:left;">Player</th><th style="padding:10px; text-align:left;">Score</th></tr></thead>
+                    <tbody id="todayLeaderboardTableBody"></tbody>
+                </table>
+                <h3 style="margin-top: 30px;">All Time XP</h3>
+                <table class="leaderboard-table" style="width: 100%; border-collapse: collapse; margin-top: 10px;">
+                    <thead><tr style="background: #f0f0f0;"><th style="padding:10px; text-align:left;">Rank</th><th style="padding:10px; text-align:left;">Player</th><th style="padding:10px; text-align:left;">XP</th><th style="padding:10px; text-align:left;">Title</th></tr></thead>
+                    <tbody id="xpLeaderboardTableBody"></tbody>
+                </table>
+            </div>
+            
+            <div id="attendance" class="tab-content">
+                <h2>Attendance</h2>
+                <div class="calendar-container">
+                    <div class="calendar-header" style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                        <button id="prevAttendanceMonthBtn">&lt;</button>
+                        <h3 id="attendanceCalendarMonthYear"></h3>
+                        <button id="nextAttendanceMonthBtn">&gt;</button>
+                    </div>
+                    <div id="attendanceCalendarBody" class="calendar-grid"></div>
+                </div>
+            </div>
+
+            <div id="help" class="tab-content">
+                <h2>About</h2>
+                <div class="dashboard-card" style="background: var(--primary-color);">
+                    <h3>Gamified Learning</h3>
+                    <p>Earn XP, maintain streaks, and unlock titles!</p>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <div id="adminPanel" class="hidden">
+        <header>
+            <h1>Admin Panel</h1>
+            <p id="adminWelcome"></p>
+            <button onclick="adminLogout()" class="btn-danger" style="position: absolute; top: 20px; right: 20px;">Logout</button>
+        </header>
+
+        <nav id="admin-tab-nav">
+            <button onclick="switchAdminTab('adminQuestionSets')" class="active">Sets</button>
+            <button onclick="switchAdminTab('reportedQuestions')">Reported</button>
+            <button onclick="switchAdminTab('adminBacklogManager')">Backlogs</button>
+            <button onclick="switchAdminTab('adminAttendance')">Attendance</button>
+            <button onclick="switchAdminTab('adminSystem')">System</button>
+        </nav>
+
+        <main>
+            <div id="adminQuestionSets" class="tab-content active">
+                <h2>Manage Sets</h2>
+                <div id="addQuestionsContent" style="background: #f0f4f8; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+                    <h3>Bulk Import</h3>
+                    <select id="setCategory"><option value="gk">GK</option><option value="math">Math</option></select>
+                    <input type="date" id="setUploadDate">
+                    <input type="text" id="setSubject" list="existingSubjectsList" placeholder="Subject" onchange="updateBulkSetDropdown()">
+                    <datalist id="existingSubjectsList"></datalist>
+                    <select id="bulkSetSelect" onchange="toggleNewBulkSetName()"></select>
+                    <div id="newBulkSetNameGroup" style="display:none;"><input type="text" id="bulkSetName" placeholder="New Set Name"></div>
+                    <textarea id="bulkQuestions" rows="6" placeholder="Paste questions here..."></textarea>
+                    <button onclick="importBulkQuestions()">Import</button>
+                </div>
+                
+                <select id="subjectFilter" onchange="filterQuestionSetsBySubject()"><option value="">All Subjects</option></select>
+                <div id="setsList"></div>
+            </div>
+
+            <div id="adminBacklogManager" class="tab-content">
+                <h2>Manage Backlogs</h2>
+                <select id="backlogPlayerSelect" onchange="renderAdminBacklogManager(this.value)"></select>
+                <div id="adminBacklogList"></div>
+            </div>
+
+            <div id="adminAttendance" class="tab-content">
+                <h2>Player Attendance</h2>
+                <select id="attendancePlayerSelect" onchange="renderAdminAttendanceCalendar(this.value)"></select>
+                <div class="calendar-container">
+                    <div class="calendar-header" style="display: flex; justify-content: space-between;">
+                        <button id="adminPrevAttendanceMonthBtn">&lt;</button>
+                        <h3 id="adminAttendanceCalendarMonthYear"></h3>
+                        <button id="adminNextAttendanceMonthBtn">&gt;</button>
+                    </div>
+                    <div id="adminAttendanceCalendarBody" class="calendar-grid"></div>
+                </div>
+            </div>
+
+            <div id="reportedQuestions" class="tab-content">
+                <h2>Reported Questions</h2>
+                <div id="reportedQuestionsList"></div>
+            </div>
+
+            <div id="adminSystem" class="tab-content">
+                <h2>System</h2>
+                <h3>Firebase</h3>
+                <textarea id="firebaseConfig" rows="4" placeholder="Config JSON"></textarea>
+                <button onclick="saveFirebaseConfig()" class="btn-success">Save</button>
+                <p>Status: <span id="firebaseStatus">Checking...</span></p>
+                
+                <h3>Data</h3>
+                <button onclick="exportData()">Export JSON</button>
+                <button onclick="importData()">Import JSON</button>
+                <button onclick="clearAllData()" class="btn-danger">Clear All Data</button>
+                
+                <h3>Users</h3>
+                <select id="passwordUserSelect"></select>
+                <input type="text" id="newUserPassword" placeholder="New Password">
+                <button onclick="updateUserPassword()" class="btn-success">Update Password</button>
+                
+                <select id="playerToRemoveSelect" style="margin-top: 20px;"></select>
+                <button onclick="removePlayer()" class="btn-danger">Remove Player</button>
+                
+                <button onclick="resetAllXP()" class="btn-danger" style="margin-top: 20px;">Reset All XP</button>
+            </div>
+
+            <div id="editQuestionsSection" class="hidden">
+                <button id="backToSetListBtn" class="btn-warning">&larr; Back</button>
+                <h3 id="editQuestionsTitle">Edit Set</h3>
+                <input type="text" id="editSetSubject" placeholder="Subject" onchange="updateSetSubject()">
+                <select id="editSetCategory" onchange="updateSetCategory()"><option value="gk">GK</option><option value="math">Math</option></select>
+                <div id="questionsToEditList"></div>
+                
+                <div id="questionEditForm" class="hidden" style="background: #fff; padding: 20px; border: 1px solid #ccc; margin-top: 20px;">
+                    <h4>Edit Question <span id="currentQuestionIndexDisplay"></span></h4>
+                    <textarea id="editQuestionText" rows="3"></textarea>
+                    <textarea id="editQuestionOptions" rows="4"></textarea>
+                    <select id="editCorrectAnswer"><option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option></select>
+                    <div style="margin-top: 10px;">
+                        <button onclick="saveEditedQuestion()" class="btn-success">Save</button>
+                        <button onclick="cancelQuestionEdit()">Cancel</button>
+                        <button onclick="deleteCurrentEditedQuestion()" class="btn-danger">Delete</button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <div id="resultsModal" class="modal"><div class="modal-content"><h2 id="modalTitle"></h2><p id="modalScore" style="font-size: 1.5em; font-weight: bold; margin: 10px 0;"></p><p id="modalTime"></p><p id="modalXPGained" style="color: var(--primary-color); font-weight: bold;"></p><button onclick="closeModal('resultsModal')">Close</button></div></div>
+    
+    <div id="passwordModal" class="modal"><div class="modal-content"><h3 id="passwordModalTitle"></h3><p id="passwordModalPrompt"></p><input type="password" id="passwordInput"><div id="passwordConfirmGroup" class="hidden"><input type="password" id="passwordConfirmInput" placeholder="Confirm"></div><button id="passwordSubmitBtn" class="btn-primary" style="margin-top: 10px;">Submit</button><button onclick="closeModal('passwordModal')" class="btn-danger" style="margin-top: 10px;">Cancel</button></div></div>
+    
+    <div id="viewDetailsModal" class="modal"><div class="modal-content" id="viewDetailsModalContent"></div></div>
+    
+    <div id="wrongAnswersModal" class="modal"><div class="modal-content" style="max-width: 800px; text-align: left;"><h2>Review Missed Questions</h2><div id="wrongAnswersBody" style="max-height: 60vh; overflow-y: auto;"></div><button onclick="closeModal('wrongAnswersModal')" style="margin-top: 20px;">Close</button></div></div>
+    
+    <div id="avatarModal" class="modal"><div class="modal-content"><h3>Choose Avatar</h3><div id="modalAvatarSelection" style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;"></div><button onclick="confirmAvatar()" class="btn-success" style="margin-top: 20px;">Confirm</button></div></div>
+    
+    <div id="statsModal" class="modal"><div class="modal-content"><h2>Statistics</h2><div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;"><div style="background:#f9f9f9; padding:10px;"><h4>XP</h4><p id="statsXP">0</p></div><div style="background:#f9f9f9; padding:10px;"><h4>Streak</h4><p id="statsStreak">0</p></div><div style="background:#f9f9f9; padding:10px;"><h4>Correct</h4><p id="statsCorrect">0</p></div><div style="background:#f9f9f9; padding:10px;"><h4>Title</h4><p id="statsTitle">-</p></div></div><button onclick="closeModal('statsModal')" style="margin-top: 20px;">Close</button></div></div>
+    
+    <div id="adminAuthModal" class="modal"><div class="modal-content"><h3 id="adminModalTitle">Admin</h3><p id="adminModalPrompt"></p><input type="text" id="adminUsername" placeholder="Username"><input type="password" id="adminPassword" placeholder="Password"><div id="adminPasswordConfirmGroup" class="hidden"><input type="password" id="adminPasswordConfirm" placeholder="Confirm Password"></div><button id="adminSubmitBtn" class="btn-primary" style="margin-top: 10px;">Submit</button><button onclick="closeModal('adminAuthModal')" class="btn-danger">Cancel</button></div></div>
+
+    <script>
+        function getLocalYYYYMMDD(dateObj) {
+            const year = dateObj.getFullYear();
+            const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+            const day = String(dateObj.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+        
+        function parseLocalDate(dateStr) {
+            if (!dateStr) return new Date();
+            const [y, m, d] = dateStr.split('-');
+            return new Date(y, m - 1, d);
+        }
+
+        function getTodayDateString() { 
+            return getLocalYYYYMMDD(new Date()); 
+        }
+
+        function clearLocalStorageProfiles() {
+            localStorage.removeItem('pscPlayerProfiles');
+            const allKeys = Object.keys(localStorage);
+            allKeys.forEach(key => { if (key.startsWith('pscPlayerPFP_')) localStorage.removeItem(key); });
+            console.log('Cleared all local storage player profiles');
+        }
+        
+        const MIN_SCORE_FOR_REVISION_SUCCESS = 70; 
+        const SRS_INTERVALS = [1, 3, 7, 14, 30, 60, 90];
+        const DESTRUCTIVE_ACTION_PASSWORD = "2525"; 
+        const QUESTION_SETS_VERSION = '1.0'; 
+        
+        const LEVEL_CONFIG = [
+            { minXp: 0, title: "Stone ⚫", nextLevelXp: 500 },
+            { minXp: 500, title: "Iron ⚙️", nextLevelXp: 1500 },
+            { minXp: 1500, title: "Bronze 🥉", nextLevelXp: 3500 },
+            { minXp: 3500, title: "Silver 🥈", nextLevelXp: 6000 },
+            { minXp: 6000, title: "Gold 🥇", nextLevelXp: 9000 },
+            { minXp: 9000, title: "Platinum 💠", nextLevelXp: 12000 },
+            { minXp: 12000, title: "Diamond 💎", nextLevelXp: Infinity }
+        ];
+
+        function checkQuestionSetsVersion() {
+            const localVersion = localStorage.getItem('pscQuestionSetsVersion');
+            if (localVersion !== QUESTION_SETS_VERSION) {
+                localStorage.removeItem('pscQuestionSets');
+                localStorage.setItem('pscQuestionSetsVersion', QUESTION_SETS_VERSION);
+                return true; 
+            }
+            return false; 
+        }
+
+        function syncQuestionSetsFromFirebase() {
+            if (!isFirebaseConnected) { showNotification('Not connected to cloud', 'warning'); return; }
+            showNotification('Downloading latest question sets...');
+            db.ref('questionSets').once('value').then(snapshot => {
+                const firebaseSets = snapshot.val() || {};
+                questionSets = firebaseSets;
+                localStorage.setItem('pscQuestionSets', JSON.stringify(questionSets));
+                loadQuestionSets();
+                updateSubjectSelect();
+                showNotification('Question sets updated from cloud!', 'success');
+            }).catch(error => { showNotification('Failed to update question sets', 'error'); });
+        }
+
+        function showCreatePlayerForm() {
+            document.getElementById('createPlayerForm').classList.remove('hidden');
+            document.getElementById('newPlayerName').focus();
+        }
+
+        function hideCreatePlayerForm() {
+            document.getElementById('createPlayerForm').classList.add('hidden');
+            document.getElementById('newPlayerName').value = '';
+        }
+
+        const quotes = ["The secret to getting ahead is getting started.", "Believe you can and you're halfway there.", "Success is the sum of small efforts, repeated day in and day out.", "The mind is everything. What you think you become.", "Strive for progress, not perfection."];
+        let audioCtx;
+
+        // --- UPDATED FIREBASE CONFIG ---
+        let firebaseConfig = {
+            apiKey: "AIzaSyDOwkZXMmiaPInoXQaj5wk1LUObRZXWihk",
+            authDomain: "binoy-6a74a.firebaseapp.com",
+            projectId: "binoy-6a74a",
+            databaseURL: "https://binoy-6a74a-default-rtdb.firebaseio.com",
+            storageBucket: "binoy-6a74a.firebasestorage.app",
+            messagingSenderId: "656074319273",
+            appId: "1:656074319273:web:049c038ffac3a6de8310b8"
+        };
+
+        function initializeFirebase() {
+            if (firebase.apps.length === 0) firebase.initializeApp(firebaseConfig);
+            db = firebase.database();
+            updateFirebaseStatus('Connecting...', false);
+            db.ref('.info/connected').on('value', snapshot => {
+                if (snapshot.val() === true) {
+                    updateFirebaseStatus('Connected', true);
+                    isFirebaseConnected = true;
+                    setTimeout(() => { loadPlayerProfilesFromFirebase(); }, 1000);
+                    performSmartSync();
+                    setupPlayerProgressListener();
+                } else {
+                    updateFirebaseStatus('Disconnected (Offline Mode)', false);
+                    isFirebaseConnected = false;
+                }
+            });
+        }
+
+        function loadPlayerProfilesFromFirebase() {
+            const localProfiles = JSON.parse(localStorage.getItem('pscPlayerProfiles')) || {};
+            if (Object.keys(localProfiles).length > 0) { playerProfiles = localProfiles; updatePlayerSelects(); }
+            if (!db) return;
+            db.ref('playerProfiles').once('value').then(snapshot => {
+                const firebaseProfiles = snapshot.val() || {};
+                if (Object.keys(firebaseProfiles).length > 0) {
+                    playerProfiles = firebaseProfiles;
+                    localStorage.setItem('pscPlayerProfiles', JSON.stringify(playerProfiles));
+                    updatePlayerSelects();
+                }
+                if (currentPlayerName) {
+                    db.ref(`revisionProgress/${currentPlayerName}`).once('value').then(revSnapshot => {
+                        const firebaseRevision = revSnapshot.val() || {};
+                        if (Object.keys(firebaseRevision).length > 0) {
+                            if (!revisionProgress[currentPlayerName]) revisionProgress[currentPlayerName] = {};
+                            Object.keys(firebaseRevision).forEach(key => { revisionProgress[currentPlayerName][key] = firebaseRevision[key]; });
+                            localStorage.setItem('pscRevisionProgress', JSON.stringify(revisionProgress));
+                            renderRevisionPage();
+                            renderBacklogPage();
+                        }
+                    });
+                }
+            });
+        }
+
+        function performSmartSync() {
+            if (!isFirebaseConnected) { loadCachedData(); return; }
+            showNotification('Checking for updates...', 'info');
+            const lastSyncTimestamp = localStorage.getItem('pscLastSyncTimestamp') || 0;
+            db.ref('questionSets').orderByChild('lastModified').startAt(parseInt(lastSyncTimestamp) + 1).once('value').then(snapshot => {
+                const newOrUpdatedSets = snapshot.val() || {};
+                const count = Object.keys(newOrUpdatedSets).length;
+                if (count > 0) {
+                    const currentRevisionProgress = JSON.parse(JSON.stringify(revisionProgress));
+                    Object.keys(newOrUpdatedSets).forEach(setName => { questionSets[setName] = newOrUpdatedSets[setName]; });
+                    revisionProgress = currentRevisionProgress;
+                    localStorage.setItem('pscQuestionSets', JSON.stringify(questionSets));
+                    localStorage.setItem('pscRevisionProgress', JSON.stringify(revisionProgress));
+                    loadQuestionSets();
+                    updateSubjectSelect();
+                    showNotification(`Updated ${count} question set(s) from cloud!`, 'success');
+                } else { showNotification('All question sets are up to date.', 'info'); }
+                const currentTimestamp = Date.now();
+                localStorage.setItem('pscLastSyncTimestamp', currentTimestamp);
+                localStorage.setItem('pscLastSyncDate', getTodayDateString());
+            }).catch(error => { showNotification('Using cached data (offline mode)', 'warning'); loadCachedData(); });
+        }
+
+        function syncRevisionProgressOnly() {
+            if (!isFirebaseConnected || !currentPlayerName) return;
+            if (revisionProgress[currentPlayerName]) { db.ref(`revisionProgress/${currentPlayerName}`).update(revisionProgress[currentPlayerName]); }
+            db.ref(`revisionProgress/${currentPlayerName}`).once('value').then(snapshot => {
+                const cloudRevisionProgress = snapshot.val();
+                if (cloudRevisionProgress) {
+                    if (!revisionProgress[currentPlayerName]) revisionProgress[currentPlayerName] = {};
+                    Object.keys(cloudRevisionProgress).forEach(key => { revisionProgress[currentPlayerName][key] = cloudRevisionProgress[key]; });
+                    localStorage.setItem('pscRevisionProgress', JSON.stringify(revisionProgress));
+                    if (document.getElementById('revision').classList.contains('active')) renderRevisionPage();
+                    if (document.getElementById('backlog').classList.contains('active')) renderBacklogPage();
+                }
+            });
+        }
+
+        function loadCachedData() {
+            questionSets = JSON.parse(localStorage.getItem('pscQuestionSets')) || {};
+            revisionProgress = JSON.parse(localStorage.getItem('pscRevisionProgress')) || {};
+            dailyRevisionScores = JSON.parse(localStorage.getItem('pscDailyRevisionScores')) || {};
+            reportedQuestions = JSON.parse(localStorage.getItem('pscReportedQuestions')) || [];
+            loadQuestionSets();
+            updateSubjectSelect();
+            console.log('Loaded cached data from localStorage');
+        }
+
+        function setupPlayerProgressListener() {
+            if (!db || !currentPlayerName) return;
+            db.ref(`playerProfiles/${currentPlayerName}`).on('value', snapshot => {
+                const cloudProfile = snapshot.val();
+                if (cloudProfile) {
+                    if (!playerProfiles[currentPlayerName]) playerProfiles[currentPlayerName] = {};
+                    playerProfiles[currentPlayerName] = { ...playerProfiles[currentPlayerName], ...cloudProfile };
+                    localStorage.setItem('pscPlayerProfiles', JSON.stringify(playerProfiles));
+                    if (document.getElementById('playerNameDisplay') && currentPlayerName) updateProgressUI();
+                }
+            });
+        }
+
+        function syncToFirebase() {
+            if (!isFirebaseConnected || !currentPlayerName) return;
+            const updates = {};
+            if (playerProfiles[currentPlayerName]) updates[`/playerProfiles/${currentPlayerName}`] = playerProfiles[currentPlayerName];
+            if (revisionProgress[currentPlayerName]) updates[`/revisionProgress/${currentPlayerName}`] = revisionProgress[currentPlayerName];
+            const todayStr = getTodayDateString();
+            if (dailyRevisionScores[todayStr]) updates['/dailyRevisionScores'] = dailyRevisionScores;
+            if (Object.keys(updates).length > 0) db.ref().update(updates).then(() => { console.log("Player progress synced to cloud."); });
+        }
+
+        let db = null;
+        let isFirebaseConnected = false;
+        
+        let questionSets = JSON.parse(localStorage.getItem('pscQuestionSets')) || {};
+        let practiceHistory = {};
+        let revisionProgress = JSON.parse(localStorage.getItem('pscRevisionProgress')) || {}; 
+        let playerProfiles = JSON.parse(localStorage.getItem('pscPlayerProfiles')) || {};
+        let reportedQuestions = JSON.parse(localStorage.getItem('pscReportedQuestions')) || [];
+        let dailyRevisionScores = JSON.parse(localStorage.getItem('pscDailyRevisionScores')) || {};
+        let adminCredentials = JSON.parse(localStorage.getItem('pscAdminCredentials')) || null;
+
+        let isAdminLoggedIn = false;
+        
+        let currentSet = [], currentQuestionIndex = 0, score = 0, timer, timeElapsed = 0, currentPlayerName = '', currentAttempt = null, totalTimeLimit = 0, isRevisionMode = false, currentRevisionKey = null;
+        let practiceInProgress = false;
+
+        let currentEditingSet = null;
+        let currentEditingIndex = -1; 
+        let editingFromReport = { active: false, reportId: null };
+
+        let selectedAvatarUrl = null;
+        let pendingPlayerName = null;
+        
+        let currentAttendanceCalendarDate = new Date();
+        let currentAdminAttendanceDate = new Date();
+        let dailyScoresListener = null;
+
+        document.addEventListener('DOMContentLoaded', init);
+        
+        function init() {
+            initializeFirebase();
+            loadLocalDataImmediately();
+            const lastPlayer = localStorage.getItem('pscLastPlayer');
+            const localProfiles = JSON.parse(localStorage.getItem('pscPlayerProfiles')) || {};
+            
+            if (lastPlayer && localProfiles[lastPlayer]) {
+                currentPlayerName = lastPlayer;
+                playerProfiles[currentPlayerName] = localProfiles[lastPlayer];
+                document.getElementById('tab-nav').classList.remove('hidden');
+                document.getElementById('setupWelcome').textContent = `Welcome, ${currentPlayerName}!`;
+                loadPlayerProgress();
+                switchPracticeView('practiceSetupView');
+                updateAllBadges();
+                updateSubjectSelect();
+                setTimeout(() => {
+                    handleDailyLogin();
+                    showNotification(`Welcome back, ${currentPlayerName}!`, 'success');
+                }, 500);
+            } else {
+                switchPracticeView('loginGatewayView');
+            }
+            
+            populateAvatars();
+            setDailyQuote();
+            document.getElementById('revisionSuccessInfo').textContent = `Revision tasks remain here`;
+            document.getElementById('setUploadDate').value = getTodayDateString();
+            document.getElementById('pfpUploadHidden').addEventListener('change', handlePFPUpload);
+            
+            document.getElementById('backToSetListBtn').addEventListener('click', () => {
+                if (editingFromReport.active) {
+                    returnToReportedQuestionsView();
+                } else {
+                    document.getElementById('editQuestionsSection').classList.add('hidden');
+                    document.getElementById('adminQuestionSets').classList.remove('hidden');
+                    currentEditingSet = null;
+                }
+            });
+            
+            document.getElementById('prevAttendanceMonthBtn').addEventListener('click', () => {
+                currentAttendanceCalendarDate.setMonth(currentAttendanceCalendarDate.getMonth() - 1);
+                renderAttendanceCalendar(currentAttendanceCalendarDate.getFullYear(), currentAttendanceCalendarDate.getMonth());
+            });
+            document.getElementById('nextAttendanceMonthBtn').addEventListener('click', () => {
+                currentAttendanceCalendarDate.setMonth(currentAttendanceCalendarDate.getMonth() + 1);
+                renderAttendanceCalendar(currentAttendanceCalendarDate.getFullYear(), currentAttendanceCalendarDate.getMonth());
+            });
+            document.getElementById('adminPrevAttendanceMonthBtn').addEventListener('click', () => {
+                currentAdminAttendanceDate.setMonth(currentAdminAttendanceDate.getMonth() - 1);
+                const selectedPlayer = document.getElementById('attendancePlayerSelect').value;
+                renderAdminAttendanceCalendar(selectedPlayer);
+            });
+            document.getElementById('adminNextAttendanceMonthBtn').addEventListener('click', () => {
+                currentAdminAttendanceDate.setMonth(currentAdminAttendanceDate.getMonth() + 1);
+                const selectedPlayer = document.getElementById('attendancePlayerSelect').value;
+                renderAdminAttendanceCalendar(selectedPlayer);
+            });
+
+            window.onclick = function(event) {
+                if (!event.target.matches('.menu-btn')) {
+                    var dropdowns = document.getElementsByClassName("dropdown-content");
+                    for (var i = 0; i < dropdowns.length; i++) {
+                        var openDropdown = dropdowns[i];
+                        if (openDropdown.classList.contains('show')) openDropdown.classList.remove('show');
+                    }
+                }
+            }
+        }
+
+        function savePlayerDataToLocalStorage() {
+            if (!currentPlayerName) return;
+            localStorage.setItem('pscPlayerProfiles', JSON.stringify(playerProfiles));
+            if (revisionProgress[currentPlayerName]) localStorage.setItem('pscRevisionProgress', JSON.stringify(revisionProgress));
+            const playerHistory = {};
+            Object.keys(practiceHistory).forEach(key => { if (practiceHistory[key].playerName === currentPlayerName) playerHistory[key] = practiceHistory[key]; });
+            localStorage.setItem('pscPracticeHistory', JSON.stringify(playerHistory));
+            localStorage.setItem('pscDailyRevisionScores', JSON.stringify(dailyRevisionScores));
+        }
+
+        function loadLocalDataImmediately() {
+            questionSets = JSON.parse(localStorage.getItem('pscQuestionSets')) || {};
+            const localProfiles = JSON.parse(localStorage.getItem('pscPlayerProfiles')) || {};
+            playerProfiles = localProfiles;
+            revisionProgress = JSON.parse(localStorage.getItem('pscRevisionProgress')) || {};
+            practiceHistory = JSON.parse(localStorage.getItem('pscPracticeHistory')) || {};
+            dailyRevisionScores = JSON.parse(localStorage.getItem('pscDailyRevisionScores')) || {};
+            loadQuestionSets();
+            updateSubjectSelect();
+            updatePlayerSelects();  
+        }
+
+        function saveQuestionSets(targetSetName = null) {
+            const timestamp = Date.now();
+            Object.keys(questionSets).forEach(setName => { 
+                if (!questionSets[setName].lastModified) questionSets[setName].lastModified = timestamp; 
+            });
+            localStorage.setItem('pscQuestionSets', JSON.stringify(questionSets));
+            
+            if (isAdminLoggedIn && isFirebaseConnected) {
+                if (targetSetName && questionSets[targetSetName]) {
+                    questionSets[targetSetName].lastModified = timestamp;
+                    db.ref(`questionSets/${targetSetName}`).set(questionSets[targetSetName])
+                      .then(() => showNotification(`synced '${targetSetName}' to cloud`));
+                } else if (currentEditingSet && questionSets[currentEditingSet]) {
+                    questionSets[currentEditingSet].lastModified = timestamp;
+                    db.ref(`questionSets/${currentEditingSet}`).set(questionSets[currentEditingSet]);
+                }
+            }
+        }
+
+        function setDailyQuote() {
+            const quoteEl = document.getElementById('motivationalQuote');
+            const quoteElLoggedIn = document.getElementById('motivationalQuoteLoggedIn');
+            const today = getTodayDateString();
+            const storedQuote = JSON.parse(localStorage.getItem('dailyQuote'));
+            let quoteToDisplay;
+            if (storedQuote && storedQuote.date === today) {
+                quoteToDisplay = storedQuote.quote;
+            } else {
+                quoteToDisplay = quotes[Math.floor(Math.random() * quotes.length)];
+                localStorage.setItem('dailyQuote', JSON.stringify({ quote: quoteToDisplay, date: today }));
+            }
+            if (quoteEl) quoteEl.textContent = quoteToDisplay;
+            if (quoteElLoggedIn) quoteElLoggedIn.textContent = quoteToDisplay;
+        }
+
+        function toggleMenu() { document.getElementById("myDropdown").classList.toggle("show"); }
+
+        function logout() {
+            currentPlayerName = '';
+            localStorage.removeItem('pscLastPlayer');
+            window.location.reload();
+        }
+
+        function initAudio() { if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
+
+        function saveFirebaseConfig() {
+            try {
+                const config = JSON.parse(document.getElementById('firebaseConfig').value);
+                firebaseConfig = config;
+                localStorage.setItem('firebaseConfig', JSON.stringify(firebaseConfig));
+                showNotification('Config saved. Reloading...');
+                setTimeout(() => window.location.reload(), 1500);
+            } catch (e) { showNotification('Invalid JSON format', 'error'); }
+        }
+
+        function resetFirebaseConfig() {
+            localStorage.removeItem('firebaseConfig');
+            document.getElementById('firebaseConfig').value = '';
+            showNotification('Config reset. Reloading...');
+            setTimeout(() => window.location.reload(), 1500);
+        }
+        
+        function testFirebaseConnection() {
+            if (!db) { showNotification('Firebase not initialized', 'error'); return; }
+            db.ref('testConnection').set({ timestamp: Date.now() })
+              .then(() => showNotification('Firebase connection test successful!'))
+              .catch(err => showNotification(`Connection test failed: ${err.message}`, 'error'));
+        }
+
+        function loadFromFirebase() {
+            if (!isFirebaseConnected) { showNotification('Firebase not connected', 'error'); return; }
+            showNotification('Using optimized data loading strategy');
+        }
+
+        function exportData() {
+            const data = { questionSets, revisionProgress, playerProfiles, reportedQuestions, dailyRevisionScores, adminCredentials };
+            const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = 'psc-prep-backup.json'; a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function importData() {
+            const input = document.createElement('input');
+            input.type = 'file'; input.accept = '.json';
+            input.onchange = e => {
+                const file = e.target.files[0];
+                const reader = new FileReader();
+                reader.onload = event => {
+                    try {
+                        const data = JSON.parse(event.target.result);
+                        if(data.questionSets) questionSets = data.questionSets;
+                        if(data.playerProfiles) playerProfiles = data.playerProfiles;
+                        if(data.reportedQuestions) reportedQuestions = data.reportedQuestions;
+                        if(data.dailyRevisionScores) dailyRevisionScores = data.dailyRevisionScores;
+                        if(data.adminCredentials) adminCredentials = data.adminCredentials;
+                        
+                        localStorage.setItem('pscQuestionSets', JSON.stringify(questionSets));
+                        localStorage.setItem('pscPracticeHistory', JSON.stringify(practiceHistory));
+                        localStorage.setItem('pscRevisionProgress', JSON.stringify(revisionProgress));
+                        localStorage.setItem('pscPlayerProfiles', JSON.stringify(playerProfiles));
+                        localStorage.setItem('pscReportedQuestions', JSON.stringify(reportedQuestions));
+                        localStorage.setItem('pscDailyRevisionScores', JSON.stringify(dailyRevisionScores));
+                        localStorage.setItem('pscAdminCredentials', JSON.stringify(adminCredentials));
+                        
+                        init();
+                        showNotification('Data imported successfully!');
+                    } catch (err) { showNotification('Invalid import file', 'error'); }
+                };
+                reader.readAsText(file);
+            };
+            input.click();
+        }
+
+        function clearAllData() {
+            promptForAdminPassword(() => {
+                questionSets = {}; practiceHistory = {}; revisionProgress = {}; playerProfiles = {}; reportedQuestions = []; dailyRevisionScores = {}; adminCredentials = null;
+                localStorage.clear();
+                if (isFirebaseConnected) { 
+                    db.ref('questionSets').remove(); db.ref('playerProfiles').remove(); db.ref('revisionProgress').remove(); db.ref('reportedQuestions').remove(); db.ref('dailyRevisionScores').remove(); db.ref('adminCredentials').remove();
+                }
+                window.location.reload();
+            });
+        }
+        
+        function removePlayer() {
+            const playerToRemove = document.getElementById('playerToRemoveSelect').value;
+            if (!playerToRemove) { return; }
+            promptForAdminPassword(() => {
+                const historyKeysToDelete = Object.keys(practiceHistory).filter(key => practiceHistory[key].playerName === playerToRemove);
+                historyKeysToDelete.forEach(key => delete practiceHistory[key]);
+                localStorage.setItem('pscPracticeHistory', JSON.stringify(practiceHistory));
+                delete revisionProgress[playerToRemove];
+                localStorage.setItem('pscRevisionProgress', JSON.stringify(revisionProgress));
+                delete playerProfiles[playerToRemove];
+                localStorage.setItem('pscPlayerProfiles', JSON.stringify(playerProfiles));
+                localStorage.removeItem(`pscPlayerPFP_${playerToRemove}`);
+                Object.keys(dailyRevisionScores).forEach(date => { if (dailyRevisionScores[date][playerToRemove]) delete dailyRevisionScores[date][playerToRemove]; });
+                localStorage.setItem('pscDailyRevisionScores', JSON.stringify(dailyRevisionScores));
+                if (isFirebaseConnected) {
+                    db.ref(`revisionProgress/${playerToRemove}`).remove(); db.ref(`playerProfiles/${playerToRemove}`).remove(); db.ref('dailyRevisionScores').set(dailyRevisionScores);
+                }
+                if (currentPlayerName === playerToRemove) { logout(); } 
+                else { updatePlayerSelects(); }
+                showNotification(`Player '${playerToRemove}' has been removed.`, 'error');
+            });
+        }
+
+        function clearPlayerHistory() {
+            const playerToClear = document.getElementById('playerToClearHistorySelect').value;
+            if (!playerToClear) { return; }
+            promptForAdminPassword(() => {
+                const keysToDelete = Object.keys(practiceHistory).filter(key => practiceHistory[key].playerName === playerToClear);
+                keysToDelete.forEach(key => { delete practiceHistory[key]; });
+                localStorage.setItem('pscPracticeHistory', JSON.stringify(practiceHistory));
+                showNotification(`All history for ${playerToClear} has been cleared.`, 'error');
+            });
+        }
+
+        function resetRevisionProgress() {
+            promptForAdminPassword(() => {
+                revisionProgress = {};
+                localStorage.removeItem('pscRevisionProgress');
+                if (isFirebaseConnected) { db.ref('revisionProgress').remove(); }
+                renderRevisionPage();
+                renderBacklogPage();
+                showNotification('All Revision Progress has been reset.', 'error');
+            });
+        }
+
+        function populateAvatars() {
+            const avatarContainer = document.getElementById('modalAvatarSelection');
+            avatarContainer.innerHTML = '';
+            const avatarSeeds = ['Leo', 'Tigger', 'Molly', 'Max', 'Zoe', 'Rocky'];
+            avatarSeeds.forEach(seed => {
+                const img = document.createElement('img');
+                const url = `https://api.dicebear.com/8.x/adventurer/svg?seed=${seed}`;
+                img.src = url; img.alt = `Avatar ${seed}`;
+                img.style.cssText = "width:60px; height:60px; border-radius:50%; cursor:pointer; border:3px solid transparent;";
+                img.onclick = () => {
+                    document.querySelectorAll('.avatar-selection img').forEach(i => i.style.borderColor = 'transparent');
+                    img.style.borderColor = 'var(--primary-color)';
+                    selectedAvatarUrl = url;
+                };
+                avatarContainer.appendChild(img);
+            });
+        }
+        
+        function updateProgressUI() {
+            if (!currentPlayerName) {
+                document.getElementById('playerStats').classList.add('hidden');
+                document.getElementById('playerPFP').classList.add('hidden');
+                return;
+            }
+            const profile = playerProfiles[currentPlayerName] || {};
+            const totalXP = profile.totalXP || 0;
+            const levelInfo = getLevelForXP(totalXP);
+            const xpForCurrentLevel = levelInfo.minXp;
+            const xpForNextLevel = levelInfo.nextLevelXp;
+            const xpProgressInLevel = totalXP - xpForCurrentLevel;
+            const xpNeededForLevel = xpForNextLevel - xpForCurrentLevel;
+            const percentage = (xpNeededForLevel > 0 && isFinite(xpNeededForLevel)) ? (xpProgressInLevel / xpNeededForLevel) * 100 : 100;
+            document.getElementById('playerStats').classList.remove('hidden');
+            document.getElementById('playerNameDisplay').textContent = `Player: ${currentPlayerName}`;
+            document.getElementById('playerTitle').textContent = levelInfo.title;
+            document.getElementById('playerXP').textContent = totalXP;
+            document.getElementById('xpBarFill').style.width = `${percentage}%`;
+        }
+        
+        function savePlayerProfiles() {
+            localStorage.setItem('pscPlayerProfiles', JSON.stringify(playerProfiles));
+            if (isFirebaseConnected) { 
+                db.ref('playerProfiles').update(playerProfiles); 
+                if (currentPlayerName && revisionProgress[currentPlayerName]) {
+                    db.ref(`revisionProgress/${currentPlayerName}`).update(revisionProgress[currentPlayerName]);
+                }
+            }
+        }
+
+        function loadPlayerProgress() {
+            if (!currentPlayerName) return;
+            updateProgressUI();
+            const pfpDataUrl = localStorage.getItem(`pscPlayerPFP_${currentPlayerName}`);
+            const pfpElement = document.getElementById('playerPFP');
+            if (pfpDataUrl) { pfpElement.src = pfpDataUrl; } 
+            else { pfpElement.src = `https://api.dicebear.com/8.x/initials/svg?seed=${currentPlayerName}`; }
+            pfpElement.classList.remove('hidden');
+            renderRevisionPage();
+            renderBacklogPage();
+        }
+        
+        function triggerPFPUpload() {
+            if (!currentPlayerName) { showNotification("Please select a player first.", "error"); return; }
+            document.getElementById('pfpUploadHidden').click();
+        }
+
+        function handlePFPUpload(event) {
+            const file = event.target.files[0];
+            if (file && file.type.startsWith('image/')) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    localStorage.setItem(`pscPlayerPFP_${currentPlayerName}`, e.target.result);
+                    document.getElementById('playerPFP').src = e.target.result;
+                    showNotification("Profile picture updated!");
+                };
+                reader.readAsDataURL(file);
+            }
+            event.target.value = null; 
+        }
+
+       function switchTab(tabName) {
+            document.body.classList.remove('practice-active');
+            document.querySelectorAll('#tab-nav button').forEach(btn => btn.classList.remove('active'));
+            const mainTabButton = document.querySelector(`#tab-nav button[onclick="switchTab('${tabName}')"]`);
+            if(mainTabButton) mainTabButton.classList.add('active');
+            document.querySelectorAll('main > .tab-content').forEach(tab => tab.classList.remove('active'));
+            document.getElementById(tabName).classList.add('active');
+            if (dailyScoresListener) { dailyScoresListener.off(); dailyScoresListener = null; }
+            if(tabName === 'leaderboard') {
+                showLeaderboards(); 
+                if (db && isFirebaseConnected) {
+                    dailyScoresListener = db.ref('dailyRevisionScores');
+                    dailyScoresListener.on('value', snapshot => {
+                        const data = snapshot.val();
+                        if (data) { dailyRevisionScores = data; localStorage.setItem('pscDailyRevisionScores', JSON.stringify(data)); showLeaderboards(); }
+                    });
+                }
+            }
+            if(tabName === 'revision') renderRevisionPage();
+            if(tabName === 'backlog') renderBacklogPage();
+            if(tabName === 'attendance') {
+                currentAttendanceCalendarDate = new Date();
+                renderAttendanceCalendar(currentAttendanceCalendarDate.getFullYear(), currentAttendanceCalendarDate.getMonth());
+            }
+        }
+
+        function switchAdminTab(tabName) {
+            document.querySelectorAll('#admin-tab-nav button').forEach(btn => btn.classList.remove('active'));
+            document.querySelector(`#admin-tab-nav button[onclick="switchAdminTab('${tabName}')"]`).classList.add('active');
+            document.querySelectorAll('#adminPanel > main > .tab-content').forEach(tab => tab.classList.remove('active'));
+            document.getElementById(tabName).classList.add('active');
+            if (tabName === 'adminQuestionSets') { document.getElementById('editQuestionsSection').classList.add('hidden'); loadQuestionSets(); }
+            if (tabName === 'reportedQuestions') { document.getElementById('editQuestionsSection').classList.add('hidden'); renderReportedQuestions(); }
+            if (tabName === 'adminBacklogManager') renderAdminBacklogManager();
+            if (tabName === 'adminAttendance') {
+                 currentAdminAttendanceDate = new Date();
+                updatePlayerSelects(); 
+                const firstPlayer = document.getElementById('attendancePlayerSelect').value;
+                renderAdminAttendanceCalendar(firstPlayer);
+            }
+            if (tabName === 'reportedQuestions') { renderReportedQuestions(); }
+            if (tabName === 'adminSystem') { document.getElementById('editQuestionsSection').classList.add('hidden'); updatePlayerSelects(); }
+        }
+        
+        function switchPracticeView(viewId) {
+            document.querySelectorAll('#practice .view-stage').forEach(view => view.classList.add('hidden'));
+            document.getElementById(viewId).classList.remove('hidden');
+        }
+
+        function showAddQuestionsSection() { document.getElementById('adminQuestionSets').classList.remove('hidden'); updateBulkSetDropdown(); }
+
+        function updateBulkSetDropdown() {
+            const bulkSelect = document.getElementById('bulkSetSelect');
+            const selectedSubject = document.getElementById('setSubject').value.trim();
+            const allSetNames = Object.keys(questionSets).filter(name => questionSets[name].type !== 'pdf');
+            let filteredSetNames;
+            if (selectedSubject) {
+                filteredSetNames = allSetNames.filter(name => {
+                    const set = questionSets[name];
+                    return (set.subject || 'Uncategorized') === selectedSubject;
+                }).sort();
+            } else { filteredSetNames = allSetNames.sort(); }
+            const currentSelection = bulkSelect.value;
+            bulkSelect.innerHTML = `<option value="">-- Select an existing set --</option>`;
+            if (filteredSetNames.length > 0) { bulkSelect.innerHTML += filteredSetNames.map(name => `<option value="${name}">${name}</option>`).join(''); }
+            bulkSelect.innerHTML += `<option value="_new_">** Create a New Set **</option>`;
+            if (filteredSetNames.includes(currentSelection) || currentSelection === "_new_") { bulkSelect.value = currentSelection; } 
+            else { bulkSelect.value = '_new_'; }
+            toggleNewBulkSetName();
+        }
+        
+        function handlePlayerSelection() {
+            const select = document.getElementById('playerSelect');
+            const name = select.value;
+            if (!name) return;
+            if (!playerProfiles[name]) { playerProfiles[name] = createNewProfile(); }
+            const profile = playerProfiles[name];
+            if (profile.password) { showPasswordPrompt(name, profile.password, () => loginPlayer(name)); } 
+            else {
+                showCreatePasswordPrompt(name, (newPassword) => {
+                    profile.password = newPassword;
+                    savePlayerProfiles();
+                    showNotification('Password created successfully!', 'success');
+                    loginPlayer(name);
+                });
+            }
+        }
+
+        function createNewProfile() { return { password: '', totalXP: 0, totalCorrect: 0, currentStreak: 0, lastActiveDate: null, consecutiveMissedDays: 0, attendance: [] }; }
+
+        function createPlayer() {
+            const input = document.getElementById('newPlayerName');
+            const name = input.value.trim();
+            if (!name) { showNotification('Please enter a name.', 'error'); return; }
+            if (Object.keys(playerProfiles).some(pName => pName.toLowerCase() === name.toLowerCase())) { showNotification('Name already exists.', 'error'); return; }
+            pendingPlayerName = name;
+            openModal('avatarModal');
+        }
+
+        function confirmAvatar() {
+            if (!pendingPlayerName) return;
+            closeModal('avatarModal');
+            showCreatePasswordPrompt(pendingPlayerName, (newPassword) => {
+                currentPlayerName = pendingPlayerName;
+                pendingPlayerName = null;
+                playerProfiles[currentPlayerName] = createNewProfile();
+                playerProfiles[currentPlayerName].password = newPassword;
+                savePlayerProfiles();
+                localStorage.setItem(`pscPlayerPFP_${currentPlayerName}`, selectedAvatarUrl || `https://api.dicebear.com/8.x/initials/svg?seed=${currentPlayerName}`);
+                updatePlayerSelects();
+                document.getElementById('playerSelect').value = currentPlayerName;
+                document.getElementById('newPlayerName').value = '';
+                loginPlayer(currentPlayerName);
+                selectedAvatarUrl = null;
+                document.querySelectorAll('.avatar-selection img').forEach(i => i.style.borderColor = 'transparent');
+            });
+        }
+        
+       function loginPlayer(name, isAutoLogin = false) {
+            currentPlayerName = name;
+            localStorage.setItem('pscLastPlayer', currentPlayerName);
+            handleDailyLogin();
+            if (!isAutoLogin) { showNotification(`Welcome, ${currentPlayerName}!`); }
+            document.getElementById('tab-nav').classList.remove('hidden');
+            document.getElementById('setupWelcome').textContent = `Welcome, ${currentPlayerName}!`;
+            loadPlayerProgress();
+            switchPracticeView('practiceSetupView');
+            updateAllBadges();
+            updateSubjectSelect();
+            setTimeout(() => { syncRevisionProgressOnly(); }, 1000);
+        }
+
+        function updateUserPassword() {
+            const userToUpdate = document.getElementById('passwordUserSelect').value;
+            const newPassword = document.getElementById('newUserPassword').value;
+            if (!userToUpdate || !newPassword) { showNotification('Please select a user and enter a new password.', 'warning'); return; }
+            if (!playerProfiles[userToUpdate]) { playerProfiles[userToUpdate] = createNewProfile(); }
+            playerProfiles[userToUpdate].password = newPassword;
+            savePlayerProfiles();
+            document.getElementById('newUserPassword').value = '';
+            showNotification(`Password for ${userToUpdate} has been updated.`, 'success');
+        }
+
+        function startPracticeWrapper(setName = null, isRev = false, revisionKey = null) {
+            if (!currentPlayerName) { return; } 
+            const selectedSetName = setName || document.getElementById('practiceSetSelect').value;
+            if (!selectedSetName) { showNotification('Please select a question set.', 'error'); return; }
+            if (isRev) {
+                const todayStr = getTodayDateString();
+                const hasRevisedToday = Object.values(practiceHistory).some(attempt => {
+                    if (attempt.playerName !== currentPlayerName || attempt.setName !== selectedSetName || !attempt.isRevision) return false;
+                    const attemptLocalStr = attempt.localDateStr || getLocalYYYYMMDD(new Date(attempt.startTime));
+                    return attemptLocalStr === todayStr;
+                });
+                if (hasRevisedToday) { showNotification("Revision already completed today.", "warning"); return; }
+            }
+            document.body.classList.add('practice-active');
+            switchPracticeView('practiceSessionView');
+            startPractice(selectedSetName, isRev, revisionKey);
+        }
+
+        function startPractice(setName, isRev, revisionKey) { 
+            if (practiceInProgress) return;
+            practiceInProgress = true;
+            initAudio();
+            isRevisionMode = isRev; currentRevisionKey = revisionKey; 
+            updateRevisionModeCSS();
+            if (isRev) { currentSet = [...(questionSets[setName].questions || [])]; } 
+            else { currentSet = [...(questionSets[setName].questions || [])].sort(() => Math.random() - 0.5); }
+            if (currentSet.length === 0) { showNotification('Selected set is empty.', 'error'); practiceInProgress = false; switchPracticeView('practiceSetupView'); return; }
+            currentQuestionIndex = 0;
+            score = 0;
+            timeElapsed = 0;
+            if (isRev) { totalTimeLimit = 999999; } 
+            else {
+                let totalTimeLimitCalculation = 0;
+                const setCategory = questionSets[setName].category;
+                if (setCategory === 'math') { totalTimeLimitCalculation = currentSet.length * 120; } // Increased Time
+                else {
+                    let statementCount = 0;
+                    let regularCount = 0;
+                    currentSet.forEach(q => { if (q.type === 'statement') { statementCount++; } else { regularCount++; } });
+                    totalTimeLimitCalculation = (statementCount * 60) + (regularCount * 30); // Increased Time limit to stop abrupt endings
+                }
+                totalTimeLimit = totalTimeLimitCalculation || 300; // 5 minute fallback
+            }
+            currentAttempt = { playerName: currentPlayerName, setName: setName, startTime: new Date().toISOString(), localDateStr: getTodayDateString(), answers: [], score: 0, totalQuestions: currentSet.length, timeLimit: totalTimeLimit, isRevision: isRevisionMode, revisionKey: isRevisionMode ? currentRevisionKey : null };
+            document.getElementById('examFooter').style.display = 'flex'; 
+            const scoreElement = document.getElementById('practiceScore');
+            if (scoreElement) { scoreElement.textContent = 'Score: 0'; }
+            clearInterval(timer); 
+            timer = setInterval(() => { 
+                timeElapsed++; 
+                const timerElement = document.getElementById('practiceTimer');
+                if (timerElement) { 
+                    if (isRevisionMode) { timerElement.textContent = `Time: ${formatTime(timeElapsed)}`; } 
+                    else {
+                        const remaining = totalTimeLimit - timeElapsed;
+                        timerElement.textContent = `Time Left: ${formatTime(Math.max(0, remaining))}`;
+                        if (remaining <= 0) { showNotification('Time limit reached!', 'error'); endPractice(); }
+                    }
+                }
+            }, 1000);
+            showNextQuestion();
+        }
+        
+        function showNextQuestion() {
+            document.getElementById('questionScrollContainer').scrollTop = 0; 
+            const statementDiv = document.querySelector('.statement-question');
+            if (statementDiv) { statementDiv.scrollTop = 0; }
+            
+            if (currentQuestionIndex >= currentSet.length) { endPractice(); return; }
+            
+            document.getElementById('endPracticeBtn').style.display = 'inline-block';
+            document.getElementById('nextQuestionBtn').style.display = 'none';
+            document.getElementById('currentQuestionNum').textContent = currentQuestionIndex + 1;
+            document.getElementById('totalQuestions').textContent = currentSet.length;
+            
+            const question = currentSet[currentQuestionIndex];
+            const qText = question.question || "Missing question text"; // Safeguard against missing text
+            let questionHTML = '';
+            
+            if (question.type === 'statement') {
+                let cleanedQuestion = qText.replace(/1\./g, '<br><br>1.').replace(/2\./g, '<br><br>2.').replace(/3\./g, '<br><br>3.').replace(/4\./g, '<br><br>4.').replace(/<br><br><br>/g, '<br><br>');
+                questionHTML = `<div class="statement-question"><strong>${currentQuestionIndex + 1}. ${cleanedQuestion}</strong></div>`;
+            } else {
+                questionHTML = `<div><strong>${currentQuestionIndex + 1}. ${qText}</strong></div>`;
+            }
+            document.getElementById('practiceQuestion').innerHTML = questionHTML;
+            
+            const qOptions = question.options || []; // Safeguard against missing options
+            const optionIds = ['optionGridA', 'optionGridB', 'optionGridC', 'optionGridD'];
+            optionIds.forEach((id, index) => {
+                const optionDiv = document.getElementById(id);
+                if (optionDiv) {
+                    optionDiv.className = 'option-grid-item';
+                    optionDiv.style.cursor = 'pointer';
+                    optionDiv.onclick = () => selectOption(index);
+                    const optionTextSpan = optionDiv.querySelector('.option-text');
+                    if (optionTextSpan) { optionTextSpan.textContent = qOptions[index] || ''; }
+                }
+            });
+            if (isRevisionMode) {
+                document.getElementById('reportQuestionBtn').style.display = 'inline-block';
+                document.getElementById('endPracticeBtn').style.display = 'inline-block'; 
+            } else {
+                document.getElementById('reportQuestionBtn').style.display = 'none';
+                document.getElementById('endPracticeBtn').style.display = 'inline-block';
+            }
+        }
+
+        function handleRevisionAnswer(selectedIndex, question) {
+            const correctAns = question.correctAnswer ? String(question.correctAnswer).toUpperCase() : 'A';
+            const correctIndex = correctAns.charCodeAt(0) - 65;
+            const isCorrect = selectedIndex === correctIndex;
+            const optionIds = ['optionGridA', 'optionGridB', 'optionGridC', 'optionGridD'];
+            optionIds.forEach(id => {
+                const optionDiv = document.getElementById(id);
+                if (optionDiv) { optionDiv.onclick = null; optionDiv.style.cursor = 'default'; }
+            });
+            optionIds.forEach((id, index) => {
+                const optionDiv = document.getElementById(id);
+                if (optionDiv) {
+                    if (index === correctIndex) optionDiv.classList.add('correct');
+                    else if (index === selectedIndex && !isCorrect) optionDiv.classList.add('wrong');
+                }
+            });
+            playSound(isCorrect ? 'correct' : 'wrong');
+            const qText = question.question || "Missing question text";
+            currentAttempt.answers.push({ isCorrect, questionText: qText, selectedAnswer: String.fromCharCode(65 + selectedIndex), correctAnswer: correctAns, viewedAnswer: true });
+            if (isCorrect) { 
+                setTimeout(() => { currentQuestionIndex++; showNextQuestion(); }, 500); 
+            } else { 
+                document.getElementById('endPracticeBtn').style.display = 'none'; 
+                document.getElementById('nextQuestionBtn').style.display = 'inline-block'; 
+                // Fix: Do not override .onclick here, as it permanently breaks standard Next button functionality
+            }
+        }     
+        
+        function selectAnswer(selectedIndex) {
+            if (isRevisionMode) return;
+            const optionIds = ['optionGridA', 'optionGridB', 'optionGridC', 'optionGridD'];
+            optionIds.forEach(id => {
+                const optionDiv = document.getElementById(id);
+                if (optionDiv) { optionDiv.onclick = null; optionDiv.style.cursor = 'default'; }
+            });
+            const question = currentSet[currentQuestionIndex];
+            const correctAns = question.correctAnswer ? String(question.correctAnswer).toUpperCase() : 'A';
+            const correctIndex = correctAns.charCodeAt(0) - 65;
+            const isCorrect = selectedIndex === correctIndex;
+            optionIds.forEach((id, index) => {
+                const optionDiv = document.getElementById(id);
+                if (optionDiv) {
+                    if (index === correctIndex) { optionDiv.classList.add('correct'); } 
+                    else if (index === selectedIndex && !isCorrect) { optionDiv.classList.add('wrong'); }
+                }
+            });
+            const lastAnswerTime = currentAttempt.answers.length > 0 ? currentAttempt.answers[currentAttempt.answers.length - 1].timeAtAnswer : 0;
+            const timeForThisQuestion = timeElapsed - lastAnswerTime;
+            const qText = question.question || "Missing question text";
+            currentAttempt.answers.push({ isCorrect, questionText: qText, questionOptions: question.options || [], selectedAnswer: String.fromCharCode(65 + selectedIndex), correctAnswer: correctAns, timeTaken: timeForThisQuestion, timeAtAnswer: timeElapsed, isSkipped: false });
+            playSound(isCorrect ? 'correct' : 'wrong');
+            if (isCorrect) { 
+                setTimeout(() => { currentQuestionIndex++; showNextQuestion(); }, 250); 
+            } else { 
+                document.getElementById('endPracticeBtn').style.display = 'none'; 
+                document.getElementById('nextQuestionBtn').style.display = 'inline-block'; 
+            }
+        }
+
+        function nextQuestionManual() {
+            document.getElementById('nextQuestionBtn').style.display = 'none';
+            document.getElementById('endPracticeBtn').style.display = 'inline-block';
+            currentQuestionIndex++;
+            showNextQuestion();
+        }
+
+        function selectOption(selectedIndex) {
+            if (isRevisionMode) { handleRevisionAnswer(selectedIndex, currentSet[currentQuestionIndex]); } 
+            else { selectAnswer(selectedIndex); }
+        }
+
+        function endPractice() {
+            if (!practiceInProgress || !currentAttempt) {
+                practiceInProgress = false; clearInterval(timer);
+                document.body.classList.remove('practice-active');
+                switchPracticeView('practiceSetupView');
+                return;
+            }
+            document.getElementById('examFooter').style.display = 'none'; 
+            const totalQuestions = currentAttempt.totalQuestions;
+            const questionsViewed = currentAttempt.answers.length;
+            const setName = currentAttempt.setName;
+
+            if (isRevisionMode) {
+                if (questionsViewed < totalQuestions && currentQuestionIndex < totalQuestions) {
+                    const confirmEnd = confirm(`You have viewed ${questionsViewed} of ${totalQuestions} questions.\n\nEnd session?`);
+                    if (!confirmEnd) {
+                        document.getElementById('examFooter').style.display = 'flex'; 
+                        return;
+                    }
+                }
+                clearInterval(timer);
+                practiceInProgress = false;
+                if (!revisionProgress[currentPlayerName]) revisionProgress[currentPlayerName] = {};
+                
+                let setProgress = revisionProgress[currentPlayerName][setName];
+                if (!setProgress || !setProgress.nextDueDate) { setProgress = { currentStage: 0 }; }
+
+                const currentStage = setProgress.currentStage || 0;
+                const nextStage = currentStage + 1;
+                const daysToAdd = SRS_INTERVALS[currentStage] || 90; 
+                const nextDate = new Date(); nextDate.setDate(nextDate.getDate() + daysToAdd);
+                const nextDateStr = getLocalYYYYMMDD(nextDate);
+                const todayStr = getTodayDateString();
+
+                revisionProgress[currentPlayerName][setName] = { currentStage: nextStage, lastCompletedDate: todayStr, nextDueDate: nextDateStr, success: true };
+                
+                savePlayerDataToLocalStorage();
+                if (isFirebaseConnected && currentPlayerName) { db.ref(`revisionProgress/${currentPlayerName}/${setName}`).set(revisionProgress[currentPlayerName][setName]); }
+                
+                setTimeout(() => {
+                    const proceedToPractice = confirm(`Revision Completed!\nNext due: ${nextDateStr}\n\nDo practice exam now?`);
+                    if (proceedToPractice) {
+                        document.body.classList.remove('practice-active');
+                        switchPracticeView('practiceSetupView');
+                        document.getElementById('subjectSelect').value = questionSets[setName]?.subject || '';
+                        updatePracticeSetSelect(document.getElementById('subjectSelect').value);
+                        document.getElementById('practiceSetSelect').value = setName;
+                        setTimeout(() => { startPracticeWrapper(setName, false, null); }, 300);
+                    } else {
+                        document.getElementById('modalTitle').textContent = "✓ Revision Completed!";
+                        document.getElementById('modalScore').textContent = `Next due: ${nextDateStr}`;
+                        document.getElementById('modalTime').textContent = `Time: ${formatTime(timeElapsed)}`;
+                        document.getElementById('modalXPGained').textContent = 'SRS Interval Increased 📈';
+                        openModal('resultsModal');
+                        document.body.classList.remove('practice-active');
+                        switchPracticeView('practiceSetupView');
+                        renderRevisionPage();
+                        renderBacklogPage();
+                        updateAllBadges();
+                    }
+                }, 300);
+                return;
+            }
+            
+            const score = currentAttempt.answers.filter(ans => ans.isCorrect).length; 
+            practiceInProgress = false;
+            clearInterval(timer);
+            const percentage = totalQuestions > 0 ? Math.round((score / totalQuestions) * 100) : 0;
+            const xpEarned = calculateAndApplyXP(score);
+            const xpMessage = xpEarned > 0 ? `You earned ${xpEarned} XP!` : 'Keep practicing!';
+            currentAttempt = {...currentAttempt, endTime: new Date().toISOString(), score, percentage, timeSpent: timeElapsed};
+            const attemptId = `attempt-${Date.now()}`;
+            practiceHistory[attemptId] = currentAttempt;
+            localStorage.setItem('pscPracticeHistory', JSON.stringify(practiceHistory));
+            document.getElementById('modalTitle').textContent = percentage >= 80 ? "Excellent!" : (percentage >= 50 ? "Good Job!" : "Keep Trying!");
+            document.getElementById('modalScore').textContent = `Score: ${score}/${totalQuestions} (${percentage}%)`;
+            document.getElementById('modalTime').textContent = `Time: ${formatTime(timeElapsed)}`;
+            document.getElementById('modalXPGained').textContent = xpMessage;
+            openModal('resultsModal');
+            if (percentage > 70) startConfetti();
+            const wrongAnswers = currentAttempt.answers.filter(ans => !ans.isCorrect);
+            if (wrongAnswers.length > 0) { showWrongAnswersPopup(wrongAnswers); }
+            document.body.classList.remove('practice-active');
+            switchPracticeView('practiceSetupView'); 
+            isRevisionMode = false; 
+            currentRevisionKey = null; 
+            currentSet = [];
+            setTimeout(() => { savePlayerProfiles(); syncRevisionProgressOnly(); }, 500);
+        }        
+
+        function handleDailyLogin() {
+            if (!currentPlayerName) return;
+            const profile = playerProfiles[currentPlayerName];
+            const today = getTodayDateString();
+            const lastDate = profile.lastActiveDate;
+            if (lastDate && /\d{4}-\d{2}-\d{2}/.test(lastDate) && lastDate < today) {
+                const last = parseLocalDate(lastDate);
+                const now = parseLocalDate(today);
+                const diffTime = now - last;
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                if (diffDays > 1) { 
+                    if (profile.currentStreak > 0) {
+                        showNotification(`Streak broken! You missed ${diffDays - 1} day(s).`, 'warning');
+                        profile.currentStreak = 0;
+                        profile.consecutiveMissedDays = diffDays -1;
+                    } else { profile.consecutiveMissedDays += diffDays -1; }
+                    let totalDeduction = 0;
+                     for(let i=0; i < diffDays - 1; i++){
+                        const dayPenalty = Math.min(50, 2**((profile.consecutiveMissedDays - (diffDays-1) + i)));
+                        totalDeduction += dayPenalty;
+                    }
+                    if(totalDeduction > 0){
+                        profile.totalXP = Math.max(0, profile.totalXP - totalDeduction);
+                        showNotification(`-${totalDeduction} XP for extended absence.`, 'error');
+                    }
+                }
+            }
+            savePlayerProfiles();
+            savePlayerDataToLocalStorage()
+            updateProgressUI();
+        }
+
+        function calculateAndApplyXP(correctAnswers) {
+            if (!currentPlayerName) return 0;
+            const profile = playerProfiles[currentPlayerName];
+            const today = getTodayDateString();
+            const oldLevelInfo = getLevelForXP(profile.totalXP || 0);
+            const scoreXp = correctAnswers;
+            let streakXp = 0;
+            const lastDate = profile.lastActiveDate;
+            if (lastDate !== today) {
+                if (!profile.attendance) profile.attendance = [];
+                if (!profile.attendance.includes(today)) {
+                    profile.attendance.push(today);
+                    showNotification('Attendance marked!', 'success');
+                }
+                const yesterday = new Date();
+                yesterday.setDate(yesterday.getDate() - 1);
+                const yesterdayString = getLocalYYYYMMDD(yesterday);
+                if (lastDate === yesterdayString) { profile.currentStreak = (profile.currentStreak || 0) + 1; } 
+                else { profile.currentStreak = 1; }
+                if (profile.currentStreak > 0) { streakXp = profile.currentStreak >= 7 ? 50 : (10 * (profile.currentStreak - 1)); }
+                profile.lastActiveDate = today;
+                profile.consecutiveMissedDays = 0;
+            }
+            const totalXpGained = scoreXp + streakXp;
+            profile.totalXP = (profile.totalXP || 0) + totalXpGained;
+            profile.totalCorrect = (profile.totalCorrect || 0) + correctAnswers;
+            const newLevelInfo = getLevelForXP(profile.totalXP);
+            if (newLevelInfo.title !== oldLevelInfo.title) { playSound('levelup'); showNotification(`Title Up! You are now a ${newLevelInfo.title}!`); }
+            savePlayerProfiles();
+            savePlayerDataToLocalStorage()
+            return totalXpGained;
+        }
+
+        function getLevelForXP(xp) { return LEVEL_CONFIG.slice().reverse().find(level => xp >= level.minXp) || LEVEL_CONFIG[0]; }
+        
+        function resetAllXP() {
+            promptForAdminPassword(() => {
+                for (const playerName in playerProfiles) {
+                    const profile = playerProfiles[playerName];
+                    profile.totalXP = 0; profile.totalCorrect = 0; profile.currentStreak = 0; profile.lastActiveDate = null; profile.consecutiveMissedDays = 0;
+                }
+                savePlayerProfiles();
+                dailyRevisionScores = {};
+                localStorage.setItem('pscDailyRevisionScores', JSON.stringify(dailyRevisionScores));
+                if (isFirebaseConnected) db.ref('dailyRevisionScores').set({});
+                if (currentPlayerName) { loadPlayerProgress(); }
+                showNotification('All player XP and streaks reset.', 'error');
+            });
+        }
+
+        function loadQuestionSets() {
+            const setsList = document.getElementById('setsList');
+            const subjectFilter = document.getElementById('subjectFilter');
+            if(!setsList) return;
+            if (subjectFilter) {
+                const allSubjects = [...new Set(Object.values(questionSets).map(set => set.subject || 'Uncategorized'))].sort();
+                const currentSelection = subjectFilter.value;
+                subjectFilter.innerHTML = '<option value="">All Subjects</option>' + allSubjects.map(subj => `<option value="${subj}">${subj}</option>`).join('');
+                if (allSubjects.includes(currentSelection)) { subjectFilter.value = currentSelection; }
+            }
+            filterQuestionSetsBySubject();
+            showAddQuestionsSection();
+            const subjectList = document.getElementById('existingSubjectsList');
+            if (subjectList) {
+                subjectList.innerHTML = ''; 
+                const existingSubjects = [...new Set(Object.values(questionSets).map(s => s.subject || ''))].filter(Boolean).sort();
+                existingSubjects.forEach(subj => { const option = document.createElement('option'); option.value = subj; subjectList.appendChild(option); });
+            }
+        }
+
+       function updateSubjectSelect() {
+            validateAndSyncQuestionSets(() => {
+                const subjectSelect = document.getElementById('subjectSelect');
+                if (!subjectSelect) return;
+                const subjects = [...new Set(Object.values(questionSets).map(s => s.subject || 'Uncategorized'))].sort();
+                const currentSelection = subjectSelect.value;
+                subjectSelect.innerHTML = '<option value="">-- Select a Subject --</option>' + subjects.map(s => `<option value="${s}">${s}</option>`).join('');
+                if(subjects.includes(currentSelection)) { subjectSelect.value = currentSelection; }
+                updatePracticeSetSelect(subjectSelect.value);
+            });
+        }
+        
+        function updatePracticeSetSelect(subject) {
+            const practiceSetSelect = document.getElementById('practiceSetSelect');
+            const startBtn = document.getElementById('startPracticeBtn');
+            if (!practiceSetSelect) return;
+            practiceSetSelect.innerHTML = '<option value="">-- Select a Question Set --</option>';
+            if (!subject) { if(startBtn) startBtn.disabled = true; return; }
+            const setsForSubject = Object.keys(questionSets).filter(setName => {
+                const set = questionSets[setName];
+                const setSubject = set.subject || 'Uncategorized';
+                return setSubject === subject && set.type !== 'pdf';
+            }).sort((a, b) => new Date(questionSets[b].uploadDate || 0) - new Date(questionSets[a].uploadDate || 0));
+            practiceSetSelect.innerHTML += setsForSubject.map(name => `<option value="${name}">${name}</option>`).join('');
+            if(startBtn) startBtn.disabled = setsForSubject.length === 0;
+        }
+
+        function updatePlayerSelects() {
+            const selects = [document.getElementById('playerSelect'), document.getElementById('playerToRemoveSelect'), document.getElementById('playerToClearHistorySelect'), document.getElementById('passwordUserSelect'), document.getElementById('attendancePlayerSelect'), document.getElementById('backlogPlayerSelect')];
+            const players = Object.keys(playerProfiles).filter(name => name && name.trim() !== '');
+            selects.forEach(s => {
+                if (!s) return;
+                const currentVal = s.value;
+                s.innerHTML = `<option value="">Select a player</option>` + players.sort().map(p => `<option value="${p}">${p}</option>`).join('');
+                if (players.includes(currentVal)) { s.value = currentVal; }
+            });
+        }
+        
+        function getAllPlayerNames() { return Object.keys(playerProfiles || {}).filter(name => name && name.trim() !== ''); }
+
+        function toggleNewBulkSetName() {
+            const select = document.getElementById('bulkSetSelect');
+            const newNameGroup = document.getElementById('newBulkSetNameGroup');
+            if (select.value === '_new_') { newNameGroup.style.display = 'block'; document.getElementById('bulkSetName').value = ''; } 
+            else { newNameGroup.style.display = 'none'; }
+        }
+
+        function importBulkQuestions() {
+            const select = document.getElementById('bulkSetSelect');
+            const subject = document.getElementById('setSubject').value.trim();
+            let setName;
+            if (select.value === '_new_') { setName = document.getElementById('bulkSetName').value.trim(); } 
+            else { setName = select.value; }
+            const bulkText = document.getElementById('bulkQuestions').value.trim();
+            if (!setName || !bulkText || !subject) { showNotification('Missing info for import.', 'error'); return; }
+            let imported = 0;
+            if(!questionSets[setName]) {
+                const uploadDate = document.getElementById('setUploadDate').value;
+                const category = document.getElementById('setCategory').value;
+                const setData = { questions: [], uploadDate: uploadDate || getTodayDateString(), type: 'questions', category: category, subject: subject };
+                questionSets[setName] = setData;
+            } else { questionSets[setName].subject = subject; }
+            bulkText.split('\n').forEach(line => {
+                const parts = line.split('|').map(p => p.trim());
+                if(parts.length === 6) {
+                    const questionText = parts[0];
+                    const hasNumberedStatements = /\d\.\s/.test(questionText);
+                    questionSets[setName].questions.push({ question: questionText, options: parts.slice(1, 5), correctAnswer: parts[5].toUpperCase(), type: hasNumberedStatements ? 'statement' : 'regular' });
+                    imported++;
+                }
+            });
+            
+            saveQuestionSets(setName);
+            
+            showNotification(`${imported} questions imported.`);
+            loadQuestionSets(); 
+            document.getElementById('bulkQuestions').value = '';
+            document.getElementById('bulkSetName').value = '';
+            document.getElementById('setSubject').value = '';
+        }
+
+        function deleteQuestionSet(setName) {
+            const confirmed = confirm(`Delete "${setName}"?`);
+            if (confirmed) {
+                if (isAdminLoggedIn && isFirebaseConnected) {
+                     db.ref(`questionSets/${setName}`).remove();
+                }
+                delete questionSets[setName];
+                saveQuestionSets(); 
+                showNotification(`Set deleted.`, 'error');
+                loadQuestionSets(); 
+            }
+        }
+        
+        function renameSet(oldName) {
+            const newName = prompt("New name:", oldName);
+            if (!newName || newName.trim() === '') return;
+            if (newName === oldName) return;
+            if (questionSets[newName]) { showNotification(`Name exists.`, 'error'); return; }
+            questionSets[newName] = { ...questionSets[oldName] };
+            delete questionSets[oldName];
+            
+            Object.keys(practiceHistory).forEach(key => { if (practiceHistory[key].setName === oldName) { practiceHistory[key].setName = newName; } });
+            
+            Object.keys(revisionProgress).forEach(player => {
+                if (revisionProgress[player][oldName]) {
+                    revisionProgress[player][newName] = revisionProgress[player][oldName];
+                    delete revisionProgress[player][oldName];
+                }
+                Object.keys(revisionProgress[player]).forEach(revKey => {
+                    if (revKey.startsWith(`${oldName}_RevDay`)) { delete revisionProgress[player][revKey]; }
+                });
+            });
+            
+            if (isAdminLoggedIn && isFirebaseConnected) {
+                 const updates = {};
+                 updates[`questionSets/${oldName}`] = null; 
+                 updates[`questionSets/${newName}`] = questionSets[newName]; 
+                 db.ref().update(updates);
+            }
+
+            localStorage.setItem('pscQuestionSets', JSON.stringify(questionSets));
+            localStorage.setItem('pscRevisionProgress', JSON.stringify(revisionProgress));
+            
+            showNotification(`Renamed to "${newName}".`, 'success');
+            loadQuestionSets();
+        }
+
+        function editQuestionSet(setName) {
+            currentEditingSet = setName;
+            document.getElementById('adminQuestionSets').classList.add('hidden');
+            document.getElementById('adminPanel').querySelector('main').appendChild(document.getElementById('editQuestionsSection'));
+            document.getElementById('editQuestionsSection').classList.remove('hidden');
+            document.getElementById('editQuestionsTitle').textContent = `Edit: ${setName}`;
+            document.getElementById('questionEditForm').classList.add('hidden');
+            document.getElementById('questionsToEditList').classList.remove('hidden');
+            const set = questionSets[setName];
+            document.getElementById('editSetCategory').value = set.category || 'gk';
+            document.getElementById('editSetSubject').value = set.subject || '';
+            const questionsListDiv = document.getElementById('questionsToEditList');
+            const questions = set.questions || [];
+            questionsListDiv.innerHTML = questions.map((q, index) => `
+                <div class="history-item" style="display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 10px;">
+                    <p style="flex-grow: 1;"><strong>${index + 1}.</strong> ${(q.question || "Empty Question").substring(0, 80)}...</p>
+                    <div><button onclick="editSpecificQuestion('${setName}', ${index})" class="btn-warning">Edit</button><button onclick="deleteSpecificQuestion('${setName}', ${index})" class="btn-danger">Delete</button></div>
+                </div>`).join('') || '<p>No questions.</p>';
+        }
+
+        function updateSetCategory() {
+            if (currentEditingSet && questionSets[currentEditingSet]) {
+                questionSets[currentEditingSet].category = document.getElementById('editSetCategory').value;
+                saveQuestionSets(currentEditingSet);
+                showNotification(`Category updated.`, 'success');
+            }
+        }
+        function updateSetSubject() {
+            if (currentEditingSet && questionSets[currentEditingSet]) {
+                questionSets[currentEditingSet].subject = document.getElementById('editSetSubject').value;
+                saveQuestionSets(currentEditingSet);
+                showNotification(`Subject updated.`, 'success');
+            }
+        }
+
+        function deleteSpecificQuestion(setName, qIndex) {
+            const confirmed = confirm(`Delete question?`);
+            if(confirmed) {
+                questionSets[setName].questions.splice(qIndex, 1);
+                saveQuestionSets(setName);
+                showNotification('Deleted.', 'error');
+                editQuestionSet(setName);
+            }
+        }
+
+        function deleteCurrentEditedQuestion() {
+            if (currentEditingSet === null || currentEditingIndex === -1) return;
+            const confirmed = confirm(`Delete question?`);
+            if(confirmed) {
+                questionSets[currentEditingSet].questions.splice(currentEditingIndex, 1);
+                saveQuestionSets(currentEditingSet);
+                showNotification('Deleted.', 'error');
+                document.getElementById('questionEditForm').classList.add('hidden');
+                editQuestionSet(currentEditingSet); 
+                currentEditingIndex = -1;
+            }
+        }
+
+        function editSpecificQuestion(setName, qIndex) {
+            currentEditingIndex = qIndex; 
+            currentEditingSet = setName;
+            const question = questionSets[setName].questions[qIndex];
+            document.getElementById('currentQuestionIndexDisplay').textContent = `${qIndex + 1}`;
+            let questionText = (question.question || "").replace(/\n\s*\n/g, '\n\n').replace(/\s+/g, ' ').trim();
+            if (question.type === 'statement') { questionText = questionText.replace(/(\d\.)/g, '\n\n$1').trim(); }
+            document.getElementById('editQuestionText').value = questionText;
+            document.getElementById('editQuestionOptions').value = (question.options || []).join('\n');
+            document.getElementById('editCorrectAnswer').value = question.correctAnswer || 'A';
+            document.getElementById('questionsToEditList').classList.add('hidden');
+            document.getElementById('questionEditForm').classList.remove('hidden');
+        }
+
+        function saveEditedQuestion() {
+            const setName = currentEditingSet; 
+            const qIndex = currentEditingIndex;
+            const newQText = document.getElementById('editQuestionText').value.trim();
+            const newOptsText = document.getElementById('editQuestionOptions').value.trim();
+            const newCorrectAnswer = document.getElementById('editCorrectAnswer').value;
+            if (!newQText || !newOptsText) { showNotification('Missing fields.', 'error'); return; }
+            const newOptions = newOptsText.split('\n').map(o => o.trim()).filter(Boolean);
+            if(newOptions.length !== 4) { showNotification('Need 4 options.', 'error'); return; }
+            const hasNumberedStatements = /\d\.\s/.test(newQText);
+            questionSets[setName].questions[qIndex] = { question: newQText, options: newOptions, correctAnswer: newCorrectAnswer, type: hasNumberedStatements ? 'statement' : 'regular' };
+            saveQuestionSets(setName);
+            showNotification(`Updated!`);
+            if (editingFromReport.active) { dismissReport(editingFromReport.reportId, true); returnToReportedQuestionsView(); } 
+            else {
+                const nextQuestionIndex = qIndex + 1;
+                const totalQuestionsInSet = questionSets[setName].questions.length;
+                if (nextQuestionIndex < totalQuestionsInSet) { editSpecificQuestion(setName, nextQuestionIndex); } 
+                else { showNotification(`All done.`, 'success'); cancelQuestionEdit(); }
+            }
+        }
+
+        function cancelQuestionEdit() {
+            if (editingFromReport.active) { returnToReportedQuestionsView(); } 
+            else {
+                document.getElementById('questionEditForm').classList.add('hidden');
+                document.getElementById('questionsToEditList').classList.remove('hidden');
+                editQuestionSet(currentEditingSet);
+                currentEditingIndex = -1;
+            }
+        }
+        
+        function showLeaderboards() { showXpLeaderboard(); showTodayLeaderboard(); }
+
+        function showXpLeaderboard() {
+            const players = getAllPlayerNames();
+            const leaderboardData = players.map(name => {
+                const profile = playerProfiles[name] || createNewProfile();
+                return { name, title: getLevelForXP(profile.totalXP || 0).title, totalXP: profile.totalXP || 0, totalCorrect: profile.totalCorrect || 0, streak: profile.currentStreak || 0 };
+            });
+            leaderboardData.sort((a, b) => b.totalXP - a.totalXP || b.totalCorrect - a.totalCorrect);
+            const tbody = document.getElementById('xpLeaderboardTableBody');
+            tbody.innerHTML = leaderboardData.map((player, i) => {
+                const highlightClass = player.name === currentPlayerName ? 'background-color: #e8dff5;' : '';
+                const rankDisplay = i < 3 ? ['🥇', '🥈', '🥉'][i] : i + 1;
+                return `<tr style="${highlightClass}"><td style="padding:10px;">${rankDisplay}</td><td style="padding:10px;">${player.name}</td><td style="padding:10px;">${player.totalXP}</td><td style="padding:10px;">${player.title}</td></tr>`;
+            }).join('') || '<tr><td colspan="4">No data.</td></tr>';
+        }
+
+        function showTodayLeaderboard() {
+            const todayStr = getTodayDateString();
+            const todayScores = dailyRevisionScores[todayStr] || {};
+            const leaderboardData = Object.entries(todayScores).map(([name, score]) => ({ name, score })).sort((a, b) => b.score - a.score);
+            const tbody = document.getElementById('todayLeaderboardTableBody');
+            tbody.innerHTML = leaderboardData.map((player, i) => {
+                 const highlightClass = player.name === currentPlayerName ? 'background-color: #e8dff5;' : '';
+                const rankDisplay = i < 3 ? ['🥇', '🥈', '🥉'][i] : i + 1;
+                return `<tr style="${highlightClass}"><td style="padding:10px;">${rankDisplay}</td><td style="padding:10px;">${player.name}</td><td style="padding:10px;">${player.score}</td></tr>`;
+            }).join('') || '<tr><td colspan="3">No scores today.</td></tr>';
+        }
+
+        function getRevisionItems(playerName = null) {
+            const targetPlayer = playerName || currentPlayerName;
+            if (!targetPlayer) return { dueToday: [], backlog: [], all: [] };
+            const dueTodayItems = []; const backlogItems = [];
+            const todayDate = new Date(); todayDate.setHours(0, 0, 0, 0);
+            const todayStr = getLocalYYYYMMDD(todayDate);
+
+            for (const setName in questionSets) {
+                const set = questionSets[setName];
+                if (!set || typeof set.uploadDate === 'undefined' || set.type === 'pdf') continue;
+                if (!set.questions || set.questions.length === 0) continue;
+
+                let progress = revisionProgress[targetPlayer] && revisionProgress[targetPlayer][setName];
+                if (!progress || !progress.nextDueDate) {
+                    let maxStage = -1;
+                    [1, 3, 7, 14, 30, 60, 90].forEach((day, index) => {
+                        const legacyKey = `${setName}_RevDay${day}`;
+                        if (revisionProgress[targetPlayer] && revisionProgress[targetPlayer][legacyKey] && revisionProgress[targetPlayer][legacyKey].success) maxStage = index;
+                    });
+                    
+                    if (maxStage === -1) {
+                        const upload = parseLocalDate(set.uploadDate);
+                        upload.setDate(upload.getDate() + 1);
+                        progress = { currentStage: 0, nextDueDate: getLocalYYYYMMDD(upload) };
+                    } else { 
+                        const pastDate = new Date();
+                        pastDate.setDate(pastDate.getDate() - 1);
+                        progress = { currentStage: maxStage + 1, nextDueDate: getLocalYYYYMMDD(pastDate) }; 
+                    }
+                }
+                const nextDueDateStr = progress.nextDueDate;
+                const nextDueDate = parseLocalDate(nextDueDateStr); 
+                nextDueDate.setHours(0,0,0,0);
+                
+                const displayDay = SRS_INTERVALS[progress.currentStage] || 90;
+                const itemData = { setName: setName, day: displayDay, stage: progress.currentStage, type: set.type || 'questions', revisionDate: nextDueDate, revisionDateStr: nextDueDateStr };
+                
+                if (nextDueDateStr === todayStr) dueTodayItems.push(itemData);
+                else if (nextDueDate < todayDate) backlogItems.push(itemData);
+            }
+            const fullBacklog = [...dueTodayItems, ...backlogItems].sort((a, b) => a.revisionDate - b.revisionDate);
+            backlogItems.sort((a, b) => a.revisionDate - b.revisionDate);
+            return { dueToday: dueTodayItems, backlog: backlogItems, all: fullBacklog };
+        }
+
+        function renderRevisionItem(item, isBacklog) {
+            let itemHtml = `<div class="history-item" style="border-left-color: ${isBacklog ? 'var(--danger-color)' : 'var(--primary-color)'};">
+                <div style="display:flex; justify-content:space-between; align-items:center;"><h4>${item.setName}</h4><span style="font-size: 0.8em; background: #eee; padding: 2px 6px; border-radius: 4px;">Interval: ${item.day} Days</span></div>`;
+            const overdueText = isBacklog ? `<span style="color:var(--danger-color); font-weight:bold;">Due: ${item.revisionDateStr}</span>` : `Due Today`;
+            itemHtml += `<p>Total Questions: ${questionSets[item.setName].questions.length}</p><p style="margin-bottom: 10px;">${overdueText}</p><button onclick="startRevisionPractice('${item.setName}', '${item.setName}')" class="btn-warning">Start Revision</button></div>`; 
+            return itemHtml;
+        }
+
+        function renderRevisionPage() {
+            const dueTodayDiv = document.getElementById('dueTodayList');
+            const userPrompt = document.getElementById('revisionUserPrompt');
+            updateAllBadges();
+            if (!currentPlayerName) { userPrompt.classList.remove('hidden'); dueTodayDiv.innerHTML = ''; return; } 
+            else { userPrompt.classList.add('hidden'); }
+            const { dueToday } = getRevisionItems();
+            dueTodayDiv.innerHTML = dueToday.length > 0 ? dueToday.map(item => renderRevisionItem(item, false)).join('') : '<p>No tasks due today!</p>';
+        }
+
+        function renderBacklogPage() {
+            const backlogDiv = document.getElementById('fullBacklogList');
+            updateAllBadges();
+            if (!currentPlayerName) { backlogDiv.innerHTML = '<p>Select a player.</p>'; return; }
+            const { backlog } = getRevisionItems();
+            backlogDiv.innerHTML = backlog.length > 0 ? backlog.map(item => renderRevisionItem(item, true)).join('') : '<p>Backlog clear!</p>';
+        }
+
+        function startRevisionPractice(setName, revisionKey) { 
+            if (!currentPlayerName) { showNotification('Select a player.', 'error'); switchTab('practice'); return; };
+            switchTab('practice');
+            setTimeout(() => startPracticeWrapper(setName, true, setName), 100); 
+        }
+
+        function updateAllBadges() {
+            if (isAdminLoggedIn) return;
+            const { dueToday, backlog } = getRevisionItems();
+            const revisionButton = document.querySelector('nav button[onclick="switchTab(\'revision\')"]');
+            updateBadgeOnButton(revisionButton, dueToday.length);
+            const backlogButton = document.querySelector('nav button[onclick="switchTab(\'backlog\')"]');
+            updateBadgeOnButton(backlogButton, backlog.length);
+            const reportedButton = document.querySelector('nav button[onclick="switchTab(\'reportedQuestions\')"]');
+            updateBadgeOnButton(reportedButton, reportedQuestions.length);
+        }
+
+        function updateAdminBadges() {
+            if (!isAdminLoggedIn) return;
+            const reportedButton = document.querySelector('#admin-tab-nav button[onclick="switchAdminTab(\'reportedQuestions\')"]');
+            updateBadgeOnButton(reportedButton, reportedQuestions.length);
+        }
+
+        function updateBadgeOnButton(button, count) {
+            if (!button) return;
+            button.style.position = 'relative';
+            let badge = button.querySelector('.revision-badge');
+            if (badge) badge.remove();
+            if (count > 0) {
+                badge = document.createElement('span');
+                badge.className = 'revision-badge';
+                badge.style.cssText = "position: absolute; top: 5px; right: 5px; background-color: var(--danger-color); color: white; border-radius: 50%; padding: 2px 6px; font-size: 10px; font-weight: bold;";
+                badge.textContent = count;
+                button.appendChild(badge);
+            }
+        }
+        
+        function getRevisionScheduleForPlayer(playerName) {
+            const schedule = {};
+            if (!playerName) return schedule;
+            const playerProg = revisionProgress[playerName] || {};
+            Object.keys(playerProg).forEach(setName => {
+                const data = playerProg[setName];
+                if (data && data.nextDueDate) {
+                     const dateKey = data.nextDueDate;
+                     if (!schedule[dateKey]) schedule[dateKey] = [];
+                     const currentInterval = SRS_INTERVALS[data.currentStage] || 90;
+                     schedule[dateKey].push({ setName, day: currentInterval });
+                }
+            });
+            return schedule;
+        }
+        
+        function showAdminRevisionDetailsForDate(dateKey, revisions, playerName) {
+            const formattedDate = new Date(dateKey + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+            let detailsHtml = `<h2>Due for ${playerName} on ${formattedDate}</h2>`;
+            revisions.forEach(rev => { detailsHtml += `<div class="history-item"><p><strong>Set: ${rev.setName} (Interval: ${rev.day} days)</strong></p></div>`; });
+            detailsHtml += `<button onclick="closeModal('viewDetailsModal')" style="margin-top:20px;">Close</button>`;
+            document.getElementById('viewDetailsModalContent').innerHTML = detailsHtml;
+            openModal('viewDetailsModal');
+        }
+
+        function showUserRevisionDetailsForDate(dateKey, revisions) {
+            const formattedDate = new Date(dateKey + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+            let detailsHtml = `<h2>Revisions Due ${formattedDate}</h2>`;
+            revisions.forEach(rev => { detailsHtml += `<div class="history-item"><p><strong>Set: ${rev.setName} (Interval: ${rev.day} days)</strong></p></div>`; });
+            detailsHtml += `<button onclick="closeModal('viewDetailsModal')" style="margin-top:20px;">Close</button>`;
+            document.getElementById('viewDetailsModalContent').innerHTML = detailsHtml;
+            openModal('viewDetailsModal');
+        }
+
+        function renderAttendanceCalendar(year, month) {
+             if (!currentPlayerName) { document.getElementById('attendanceCalendarBody').innerHTML = '<p>Select a player.</p>'; document.getElementById('attendanceCalendarMonthYear').textContent = ''; return; }
+            const profile = playerProfiles[currentPlayerName];
+            const attendance = profile.attendance || [];
+            const revisionSchedule = getRevisionScheduleForPlayer(currentPlayerName);
+            const monthName = new Date(year, month).toLocaleString('default', { month: 'long' });
+            document.getElementById('attendanceCalendarMonthYear').textContent = `${monthName} ${year}`;
+            const calendarBody = document.getElementById('attendanceCalendarBody');
+            calendarBody.innerHTML = '';
+            const firstDayOfMonth = (new Date(year, month, 1).getDay() + 6) % 7; 
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            const daysOfWeek = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+            daysOfWeek.forEach(day => { calendarBody.innerHTML += `<div style="font-weight:bold; text-align:center;">${day}</div>`; });
+            for (let i = 0; i < firstDayOfMonth; i++) { calendarBody.innerHTML += `<div></div>`; }
+            const todayStr = getTodayDateString();
+            for (let day = 1; day <= daysInMonth; day++) {
+                const dayCell = document.createElement('div');
+                dayCell.classList.add('calendar-day'); dayCell.textContent = day;
+                const dateKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                if (attendance.includes(dateKey)) { dayCell.classList.add('present'); }
+                if (revisionSchedule[dateKey]) { dayCell.style.border = "1px solid var(--primary-color)"; dayCell.style.cursor = "pointer"; dayCell.onclick = () => showUserRevisionDetailsForDate(dateKey, revisionSchedule[dateKey]); }
+                if (dateKey === todayStr) { dayCell.classList.add('today'); }
+                calendarBody.appendChild(dayCell);
+            }
+        }
+        
+        function renderAdminAttendanceCalendar(playerName) {
+            const year = currentAdminAttendanceDate.getFullYear();
+            const month = currentAdminAttendanceDate.getMonth();
+            const monthName = new Date(year, month).toLocaleString('default', { month: 'long' });
+            document.getElementById('adminAttendanceCalendarMonthYear').textContent = `${monthName} ${year}`;
+            const calendarBody = document.getElementById('adminAttendanceCalendarBody');
+            if (!playerName || !playerProfiles[playerName]) { calendarBody.innerHTML = '<p>Select a player.</p>'; return; }
+            const profile = playerProfiles[playerName];
+            const attendance = profile.attendance || [];
+            const revisionSchedule = getRevisionScheduleForPlayer(playerName);
+            calendarBody.innerHTML = '';
+            const firstDayOfMonth = (new Date(year, month, 1).getDay() + 6) % 7; 
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            const daysOfWeek = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+            daysOfWeek.forEach(day => { calendarBody.innerHTML += `<div style="font-weight:bold; text-align:center;">${day}</div>`; });
+            for (let i = 0; i < firstDayOfMonth; i++) { calendarBody.innerHTML += `<div></div>`; }
+            const todayStr = getTodayDateString();
+            for (let day = 1; day <= daysInMonth; day++) {
+                const dayCell = document.createElement('div');
+                dayCell.classList.add('calendar-day'); dayCell.textContent = day;
+                const dateKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                if (attendance.includes(dateKey)) { dayCell.classList.add('present'); }
+                if (revisionSchedule[dateKey]) { dayCell.style.border = "1px solid var(--primary-color)"; dayCell.style.cursor = "pointer"; dayCell.onclick = () => showAdminRevisionDetailsForDate(dateKey, revisionSchedule[dateKey], playerName); }
+                if (dateKey === todayStr) { dayCell.classList.add('today'); }
+                calendarBody.appendChild(dayCell);
+            }
+        }
+
+        function showPlayerStatsModal() {
+            if (!currentPlayerName) { showNotification("Select a player.", "warning"); return; }
+            const profile = playerProfiles[currentPlayerName] || createNewProfile();
+            document.getElementById('statsTitle').textContent = getLevelForXP(profile.totalXP || 0).title;
+            document.getElementById('statsXP').textContent = profile.totalXP || 0;
+            document.getElementById('statsCorrect').textContent = profile.totalCorrect || 0;
+            document.getElementById('statsStreak').textContent = `${profile.currentStreak || 0} Day(s)`;
+            openModal('statsModal');
+        }
+
+        function showWrongAnswersPopup(wrongAnswers) {
+            const body = document.getElementById('wrongAnswersBody');
+            body.innerHTML = wrongAnswers.map((ans, index) => {
+                const qOptions = ans.questionOptions || [];
+                const correctAns = ans.correctAnswer ? String(ans.correctAnswer).toUpperCase() : 'A';
+                const correctIndex = correctAns.charCodeAt(0) - 65;
+                const correctText = qOptions[correctIndex] || 'N/A';
+                let yourAnswerText = "Skipped";
+                if (!ans.isSkipped && ans.selectedAnswer) {
+                    const selectedIndex = ans.selectedAnswer.charCodeAt(0) - 65;
+                    yourAnswerText = qOptions[selectedIndex] || 'N/A';
+                }
+                const qText = ans.questionText || "";
+                let questionText = qText.replace(/1\./g, '<br>1.').replace(/2\./g, '<br><br>2.').replace(/3\./g, '<br><br>3.').replace(/4\./g, '<br><br>4.');
+                return `<div class="history-item" style="border-left-color: var(--danger-color);"><div class="statement-question"><strong>${index + 1}. ${questionText}</strong></div>
+                        <p style="color: var(--danger-color);">Your Answer: ${ans.selectedAnswer || 'None'}. ${yourAnswerText}</p>
+                        <p style="color: var(--success-color);">Correct Answer: ${correctAns}. ${correctText}</p></div>`;
+            }).join('');
+            openModal('wrongAnswersModal');
+        }
+        
+        function handleAdminLogin() {
+            if (isFirebaseConnected) {
+                db.ref('adminCredentials').once('value').then(snapshot => {
+                    const credentials = snapshot.val();
+                    if (credentials) showAdminLoginModal(); else showAdminSetupModal();
+                }).catch(error => { showAdminSetupModal(); });
+            } else {
+                const localCredentials = JSON.parse(localStorage.getItem('pscAdminCredentials'));
+                if (localCredentials) showAdminLoginModal(); else showAdminSetupModal();
+            }
+        }
+
+        function showAdminLoginModal() {
+            document.getElementById('adminModalTitle').textContent = "Admin Login";
+            document.getElementById('adminModalPrompt').textContent = "Enter credentials.";
+            document.getElementById('adminPasswordConfirmGroup').classList.add('hidden');
+            document.getElementById('adminSubmitBtn').textContent = "Login";
+            document.getElementById('adminSubmitBtn').onclick = loginAdmin;
+            document.getElementById('adminUsername').value = ''; document.getElementById('adminPassword').value = '';
+            openModal('adminAuthModal');
+        }
+
+        function showAdminSetupModal() {
+            document.getElementById('adminModalTitle').textContent = "Setup Admin";
+            document.getElementById('adminModalPrompt').textContent = "Create admin account.";
+            document.getElementById('adminPasswordConfirmGroup').classList.remove('hidden');
+            document.getElementById('adminSubmitBtn').textContent = "Create";
+            document.getElementById('adminSubmitBtn').onclick = createAdmin;
+            document.getElementById('adminUsername').value = ''; document.getElementById('adminPassword').value = ''; document.getElementById('adminPasswordConfirm').value = '';
+            openModal('adminAuthModal');
+        }
+
+        function createAdmin() {
+            const username = document.getElementById('adminUsername').value.trim();
+            const password = document.getElementById('adminPassword').value;
+            const confirmPass = document.getElementById('adminPasswordConfirm').value;
+            if (!username || !password) return;
+            if (password !== confirmPass) { showNotification('Passwords do not match.', 'error'); return; }
+            const newCredentials = { username, password };
+            if (isFirebaseConnected) {
+                db.ref('adminCredentials').set(newCredentials).then(() => {
+                    localStorage.setItem('pscAdminCredentials', JSON.stringify(newCredentials));
+                    closeModal('adminAuthModal');
+                    enterAdminMode(username);
+                });
+            } else {
+                localStorage.setItem('pscAdminCredentials', JSON.stringify(newCredentials));
+                closeModal('adminAuthModal');
+                enterAdminMode(username);
+            }
+        }
+
+        function loginAdmin() {
+            const username = document.getElementById('adminUsername').value;
+            const password = document.getElementById('adminPassword').value;
+            const checkCredentials = (credentials) => {
+                if (credentials && username === credentials.username && password === credentials.password) { closeModal('adminAuthModal'); enterAdminMode(username); } 
+                else { showNotification('Invalid credentials.', 'error'); }
+            };
+            if (isFirebaseConnected) {
+                db.ref('adminCredentials').once('value').then(snapshot => {
+                    const credentials = snapshot.val();
+                    if (credentials) checkCredentials(credentials); else checkCredentials(JSON.parse(localStorage.getItem('pscAdminCredentials')));
+                });
+            } else { checkCredentials(JSON.parse(localStorage.getItem('pscAdminCredentials'))); }
+        }
+
+        function enterAdminMode(username) {
+            isAdminLoggedIn = true;
+            document.querySelector('.container').classList.add('hidden');
+            document.getElementById('adminPanel').classList.remove('hidden');
+            document.getElementById('adminWelcome').textContent = `Admin: ${username}`;
+            updatePlayerSelects();
+            updateAdminBadges();
+            switchAdminTab('adminQuestionSets');
+        }
+
+        function adminLogout() {
+            isAdminLoggedIn = false;
+            document.querySelector('.container').classList.remove('hidden');
+            document.getElementById('adminPanel').classList.add('hidden');
+        }
+
+        function renderAdminBacklogManager(playerName) {
+            const listDiv = document.getElementById('adminBacklogList');
+            if (!playerName) { listDiv.innerHTML = '<p>Select player.</p>'; return; }
+            const { backlog } = getRevisionItems(playerName);
+            listDiv.innerHTML = backlog.map(item => `
+                <div class="history-item" style="border-left-color: var(--danger-color); display: flex; justify-content: space-between; align-items: center;">
+                    <div><h4>${item.setName}</h4><p>Due: ${item.revisionDate.toLocaleDateString()}</p></div>
+                    <button onclick="removeBacklogItem('${playerName}', '${item.setName}')" class="btn-danger">Skip</button>
+                </div>
+            `).join('') || `<p>No backlog.</p>`;
+        }
+
+        function removeBacklogItem(playerName, setName) {
+            const confirmed = confirm(`Skip backlog?`);
+            if (confirmed) {
+                if (!revisionProgress[playerName]) revisionProgress[playerName] = {};
+                let prog = revisionProgress[playerName][setName] || { currentStage: 0 };
+                const nextStage = (prog.currentStage || 0) + 1;
+                const daysToAdd = SRS_INTERVALS[prog.currentStage || 0] || 90;
+                const nextDate = new Date(); nextDate.setDate(nextDate.getDate() + daysToAdd);
+                revisionProgress[playerName][setName] = { currentStage: nextStage, lastCompletedDate: getTodayDateString(), nextDueDate: getLocalYYYYMMDD(nextDate), clearedByAdmin: true };
+                savePlayerDataToLocalStorage();
+                if (isFirebaseConnected) db.ref(`revisionProgress/${playerName}/${setName}`).set(revisionProgress[playerName][setName]);
+                showNotification('Skipped.', 'success');
+                renderAdminBacklogManager(playerName); 
+            }
+        }
+
+        function promptForAdminPassword(onSuccess) {
+            const pass = prompt("Admin Password (2525):");
+            if (pass === DESTRUCTIVE_ACTION_PASSWORD) onSuccess(); else if (pass !== null) showNotification('Wrong password.', 'error');
+        }
+
+        function formatTime(totalSeconds) {
+            const minutes = Math.floor(totalSeconds / 60); const seconds = totalSeconds % 60;
+            return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+        }
+
+        function showNotification(message, type = 'success') {
+            const notification = document.createElement('div');
+            notification.textContent = message;
+            notification.style.cssText = `position: fixed; top: 20px; right: 20px; padding: 15px; border-radius: 8px; color: white; background: ${type === 'success' ? 'var(--success-color)' : (type === 'error' ? 'var(--danger-color)' : 'var(--warning-color)')}; box-shadow: 0 5px 15px rgba(0,0,0,0.2); z-index: 5000; transform: translateX(120%); transition: transform 0.5s;`;
+            document.body.appendChild(notification);
+            setTimeout(() => { notification.style.transform = 'translateX(0)'; }, 10);
+            setTimeout(() => { notification.style.transform = 'translateX(120%)'; setTimeout(() => notification.remove(), 500); }, 3000);
+        }
+
+        function openModal(id) { document.getElementById(id).style.display = 'flex'; }
+        function closeModal(id) { document.getElementById(id).style.display = 'none'; if(id === 'viewDetailsModal') {document.getElementById('viewDetailsModalContent').innerHTML='';} }
+        
+        function showPasswordPrompt(playerName, correctPassword, onSuccess) {
+            document.getElementById('passwordConfirmGroup').classList.add('hidden');
+            document.getElementById('passwordModalTitle').textContent = `Login: ${playerName}`;
+            document.getElementById('passwordModalPrompt').textContent = 'Password:';
+            const input = document.getElementById('passwordInput');
+            const submitBtn = document.getElementById('passwordSubmitBtn');
+            submitBtn.textContent = 'Login'; input.value = '';
+            openModal('passwordModal'); input.focus();
+            submitBtn.onclick = () => { if (input.value === correctPassword) { onSuccess(); closeModal('passwordModal'); } else { showNotification('Wrong Password', 'error'); } };
+            input.onkeyup = (event) => { if(event.key === 'Enter') submitBtn.click(); }
+        }
+
+        function showCreatePasswordPrompt(playerName, onSuccess) {
+            document.getElementById('passwordModalTitle').textContent = `Create Password: ${playerName}`;
+            document.getElementById('passwordModalPrompt').textContent = 'Set a password.';
+            document.getElementById('passwordConfirmGroup').classList.remove('hidden');
+            const passInput = document.getElementById('passwordInput');
+            const confirmInput = document.getElementById('passwordConfirmInput');
+            const submitBtn = document.getElementById('passwordSubmitBtn');
+            submitBtn.textContent = 'Create'; passInput.value = ''; confirmInput.value = '';
+            openModal('passwordModal'); passInput.focus();
+            const handleSubmit = () => {
+                const pass = passInput.value; const confirmPass = confirmInput.value;
+                if (!pass) return;
+                if (pass !== confirmPass) { showNotification('Mismatch.', 'error'); return; }
+                onSuccess(pass); closeModal('passwordModal');
+            };
+            submitBtn.onclick = handleSubmit;
+            passInput.onkeyup = (event) => { if(event.key === 'Enter') confirmInput.focus(); }
+            confirmInput.onkeyup = (event) => { if(event.key === 'Enter') submitBtn.click(); }
+        }
+        
+        function playSound(type) {
+             if (!audioCtx) return;
+            const oscillator = audioCtx.createOscillator(); const gainNode = audioCtx.createGain();
+            oscillator.connect(gainNode); gainNode.connect(audioCtx.destination);
+            gainNode.gain.setValueAtTime(0, audioCtx.currentTime); gainNode.gain.linearRampToValueAtTime(0.3, audioCtx.currentTime + 0.01);
+            if (type === 'correct') { oscillator.type = 'sine'; oscillator.frequency.setValueAtTime(600, audioCtx.currentTime); oscillator.frequency.exponentialRampToValueAtTime(800, audioCtx.currentTime + 0.1); } 
+            else if (type === 'wrong') { oscillator.type = 'square'; oscillator.frequency.setValueAtTime(200, audioCtx.currentTime); oscillator.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.2); } 
+            else if (type === 'levelup') { oscillator.type = 'triangle'; oscillator.frequency.setValueAtTime(440, audioCtx.currentTime); oscillator.frequency.linearRampToValueAtTime(880, audioCtx.currentTime + 0.1); oscillator.frequency.linearRampToValueAtTime(660, audioCtx.currentTime + 0.2); }
+            oscillator.start(audioCtx.currentTime); gainNode.gain.exponentialRampToValueAtTime(0.00001, audioCtx.currentTime + 0.2); oscillator.stop(audioCtx.currentTime + 0.2);
+        }
+        
+        const confettiCanvas = document.getElementById('confetti-canvas'), confettiCtx = confettiCanvas.getContext('2d');
+        let confettiParticles = [], animationFrameId;
+        function startConfetti() {
+            confettiCanvas.width = window.innerWidth; confettiCanvas.height = window.innerHeight;
+            confettiParticles = Array.from({ length: 150 }, createConfettiParticle);
+            animateConfetti();
+            setTimeout(stopConfetti, 4000);
+        }
+        function stopConfetti() { cancelAnimationFrame(animationFrameId); if(confettiCtx) confettiCtx.clearRect(0, 0, confettiCanvas.width, confettiCanvas.height); }
+        function createConfettiParticle() {
+            const colors = ['#f1c40f', '#e74c3c', '#3498db', '#8e44ad', '#2ecc71'];
+            return { x: Math.random() * confettiCanvas.width, y: -20, w: Math.random() * 10 + 5, h: Math.random() * 10 + 5, color: colors[Math.floor(Math.random() * colors.length)], vx: (Math.random() - 0.5) * 4, vy: Math.random() * 4 + 2, angle: Math.random() * Math.PI * 2, angularVelocity: (Math.random() - 0.5) * 0.1 };
+        }
+        function animateConfetti() {
+            if(!confettiCtx) return;
+            confettiCtx.clearRect(0, 0, confettiCanvas.width, confettiCanvas.height);
+            confettiParticles.forEach((p, i) => {
+                p.x += p.vx; p.y += p.vy; p.angle += p.angularVelocity;
+                if (p.y > confettiCanvas.height) confettiParticles.splice(i, 1);
+                confettiCtx.save(); confettiCtx.translate(p.x, p.y); confettiCtx.rotate(p.angle);
+                confettiCtx.fillStyle = p.color; confettiCtx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+                confettiCtx.restore();
+            });
+            if (confettiParticles.length > 0) animationFrameId = requestAnimationFrame(animateConfetti);
+        }
+
+       function reportCurrentQuestion() {
+            if (!isRevisionMode) { showNotification('Only in revision mode.', 'warning'); return; }
+            const question = currentSet[currentQuestionIndex];
+            const isAlreadyReported = reportedQuestions.some(r => r.setName === currentAttempt.setName && r.question.question === question.question);
+            if (isAlreadyReported) { showNotification('Already reported.', 'warning'); return; }
+            reportedQuestions.push({ reportId: `report-${Date.now()}`, setName: currentAttempt.setName, question: JSON.parse(JSON.stringify(question)), reportedAt: new Date().toISOString(), reportedBy: currentPlayerName });
+            localStorage.setItem('pscReportedQuestions', JSON.stringify(reportedQuestions));
+            if (isFirebaseConnected) { db.ref('reportedQuestions').set(reportedQuestions); }
+            showNotification('Reported.', 'success');
+            updateAdminBadges();
+        }
+
+        function renderReportedQuestions() {
+            const listDiv = document.getElementById('reportedQuestionsList');
+            if (reportedQuestions.length === 0) { listDiv.innerHTML = '<p>No reports.</p>'; return; }
+            listDiv.innerHTML = reportedQuestions.map(report => {
+                const correctOpt = report.question.options[report.question.correctAnswer.charCodeAt(0) - 65];
+                return `<div class="history-item" style="border-left-color: var(--danger-color);"><p><strong>${report.question.question}</strong></p>
+                    <button onclick="editReportedQuestion('${report.reportId}')" class="btn-warning">Review</button><button onclick="dismissReport('${report.reportId}')" class="btn-success">Dismiss</button></div>`;
+            }).join('');
+        }
+
+        function dismissReport(reportId, silent = false) {
+            reportedQuestions = reportedQuestions.filter(r => r.reportId !== reportId);
+            localStorage.setItem('pscReportedQuestions', JSON.stringify(reportedQuestions));
+            if (isFirebaseConnected) db.ref('reportedQuestions').set(reportedQuestions);
+            updateAdminBadges();
+            if (!silent) showNotification('Dismissed.', 'success');
+        }
+
+        function editReportedQuestion(reportId) {
+            const report = reportedQuestions.find(r => r.reportId === reportId);
+            if (!report) return;
+            const qIndex = (questionSets[report.setName]?.questions || []).findIndex(q => q.question === report.question.question);
+            if (qIndex === -1) { showNotification('Original missing.', 'error'); dismissReport(reportId); return; }
+            editingFromReport = { active: true, reportId: report.reportId };
+            switchAdminTab('adminQuestionSets');
+            editQuestionSet(report.setName);
+            setTimeout(() => editSpecificQuestion(report.setName, qIndex), 100);
+        }
+        
+       function returnToReportedQuestionsView() {
+            editingFromReport = { active: false, reportId: null };
+            document.getElementById('editQuestionsSection').classList.add('hidden');
+            switchAdminTab('reportedQuestions');
+            renderReportedQuestions();
+        }
+
+        function exportQuestionSet(setName) {
+            const set = questionSets[setName];
+            if (!set || !set.questions) return;
+            const formattedQuestions = set.questions.map(q => {
+            const questionText = (q.question || "").replace(/\n/g, ' ').trim();
+            const options = (q.options || []).map(opt => opt.replace(/\n/g, ' ').trim());
+            const correctAns = q.correctAnswer || "A";
+            return `${questionText}|${options[0] || ''}|${options[1] || ''}|${options[2] || ''}|${options[3] || ''}|${correctAns.toUpperCase()}`;
+            }).join('\n');
+            navigator.clipboard.writeText(formattedQuestions).then(() => { showNotification(`Copied to clipboard!`, 'success'); });
+        }
+
+        function updateFirebaseStatus(status, isConnected) {
+            const statusEl = document.getElementById('firebaseStatus');
+            if (statusEl) { statusEl.textContent = status; statusEl.style.color = isConnected ? 'green' : 'red'; }
+        }
+
+        function validateAndSyncQuestionSets(callback) {
+            if (!isFirebaseConnected) { if(callback) callback(); return; }
+            performSmartSync();
+            if (callback) { setTimeout(callback, 1000); }
+        }
+        
+        function updateRevisionModeCSS() {
+            if (isRevisionMode) document.body.classList.add('is-revision-mode'); else document.body.classList.remove('is-revision-mode');
+        }
+
+        function filterQuestionSetsBySubject() {
+            const selectedSubject = document.getElementById('subjectFilter').value;
+            const setsListDiv = document.getElementById('setsList');
+            if (!setsListDiv) return;
+            let filteredSetNames;
+            if (selectedSubject) {
+                filteredSetNames = Object.keys(questionSets).filter(setName => (questionSets[setName].subject || 'Uncategorized') === selectedSubject).sort((a, b) => new Date(questionSets[b].uploadDate || 0) - new Date(questionSets[a].uploadDate || 0));
+            } else { filteredSetNames = Object.keys(questionSets).sort((a, b) => new Date(questionSets[b].uploadDate || 0) - new Date(questionSets[a].uploadDate || 0)); }
+            setsListDiv.innerHTML = filteredSetNames.map(setName => {
+                const set = questionSets[setName];
+                return `<div class="history-item" style="display: flex; justify-content: space-between; align-items: center;"><div><h4>${setName} (${set.questions.length})</h4></div><div><button onclick="editQuestionSet('${setName}')" class="btn-warning">Edit</button><button onclick="renameSet('${setName}')" class="btn-warning" style="background:#3498db;">Name</button><button onclick="exportQuestionSet('${setName}')" class="btn-success">Copy</button><button onclick="deleteQuestionSet('${setName}')" class="btn-danger">Del</button></div></div>`;
+            }).join('') || '<p>No sets.</p>';
+        }
+
+        function proceedToNextQuestion() {
+            document.getElementById('questionScrollContainer').scrollTop = 0; 
+            currentQuestionIndex++;
+            showNextQuestion();
+        }
+    </script>
+</body>
+</html>
